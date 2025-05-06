@@ -10,4 +10,18 @@ declare global {
 	}
 }
 
+declare namespace svelteHTML {
+	interface HTMLAttributes<T> extends AriaAttributes, DOMAttributes<T> {
+		[key: string]: any;
+	}
+}
+
+interface AriaAttributes {
+	[key: string]: any;
+}
+
+interface DOMAttributes<T> {
+	[key: string]: any;
+}
+
 export {};
