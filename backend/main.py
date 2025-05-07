@@ -59,20 +59,35 @@ def upload_file():
     if file:
         filename = secure_filename(file.filename)
         try:
+            # Read the file content
+            file_content = file.read()
+            file_size = len(file_content)
+            print(f"File size: {file_size} bytes")
+            
+            if file_size == 0:
+                return jsonify({'error': 'Empty file uploaded'}), 400
+            
+            # Create a BytesIO object from the file content
+            file_buffer = io.BytesIO(file_content)
+            
             # Upload file to MinIO
             minio_client.put_object(
                 MINIO_BUCKET,
                 filename,
-                file,
-                file.content_length,
+                file_buffer,
+                file_size,
                 content_type=file.content_type
             )
             
+            print(f"File {filename} uploaded successfully to MinIO")
+            
             return jsonify({
                 'message': 'File uploaded successfully',
-                'filename': filename
+                'filename': filename,
+                'size': file_size
             })
         except Exception as e:
+            print(f"Error uploading file: {str(e)}")
             return jsonify({'error': str(e)}), 500
 
 @app.route('/api/analyze', methods=['POST'])
@@ -93,50 +108,54 @@ def analyze_data():
 @app.route('/api/csv-query', methods=['POST'])
 def handle_csv_query():
     data = request.get_json()
-    if not data or 'filename' not in data or 'question' not in data:
+    if not data or 'filename' not in data or 'query' not in data:
         return jsonify({'error': 'Missing filename or question'}), 400
     
     try:
         # Get the file from MinIO
+        print("Getting file from minio")
         response = minio_client.get_object(MINIO_BUCKET, data['filename'])
-        df = pd.read_csv(response)
+        print("File found")
+        
+        # Read the CSV data into a BytesIO buffer
+        csv_data = io.BytesIO(response.read())
+        print("CSV data loaded into buffer")
+        
+        # Debug: Print the actual content of the buffer
+        # csv_data.seek(0)
+        # content = csv_data.read().decode('utf-8')
+        # print("CSV Content:", content[:500])  # Print first 500 characters
+        # csv_data.seek(0)
+        
+        # Try reading with different parameters
+        try:
+            df = pd.read_csv(csv_data, sep=',')
+        except:
+            csv_data.seek(0)
+            try:
+                df = pd.read_csv(csv_data, sep=';')
+            except:
+                csv_data.seek(0)
+                df = pd.read_csv(csv_data, sep=None, engine='python')
+        
+        # print("DataFrame created successfully")
+        # print("DataFrame columns:", df.columns.tolist())
+        # print("DataFrame shape:", df.shape)
         
         # Create pandas agent
         agent = pandas_agent(df)
+        print("Agent created successfully")
         
         # Run the query
-        result = agent.run(data['question'])
-        
-        # Check if there are any active matplotlib figures
-        if plt.get_fignums():
-            # Get the current figure
-            fig = plt.gcf()
-            
-            # Convert the figure to a base64 string
-            buf = io.BytesIO()
-            fig.savefig(buf, format='png', bbox_inches='tight')
-            buf.seek(0)
-            img_str = base64.b64encode(buf.read()).decode('utf-8')
-            
-            # Clear the figure to free memory
-            plt.close('all')
-            
-            return jsonify({
-                'message': 'Query processed successfully',
-                'result': result,
-                'visualization': {
-                    'type': 'image',
-                    'data': img_str
-                }
-            })
+        result = agent.invoke(data['query'])
+        print(result.output)
         
         return jsonify({
             'message': 'Query processed successfully',
-            'result': result
+            'result': result.output
         })
     except Exception as e:
-        # Make sure to close any open figures in case of error
-        plt.close('all')
+        print(f"Error processing CSV query: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 def main():

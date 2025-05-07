@@ -14,7 +14,8 @@ dependencies = [
     "minio",
     "python-dotenv",
     "matplotlib",
-    "pandas"
+    "pandas",
+    "langchain_experimental"
 ]
 
 [build-system]

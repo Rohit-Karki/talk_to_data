@@ -6,6 +6,7 @@
     let analysisQuery = '';
     let loading = false;
     let error: string | null = null;
+    let result: string | null = null;
     let chartData: string | null = null; // Base64 encoded image data
 
     async function handleFileUpload(event: CustomEvent<{ filename: string }>) {
@@ -23,7 +24,7 @@
         chartData = null;
 
         try {
-            const response = await fetch('http://localhost:5000/api/analyze', {
+            const response = await fetch('http://localhost:5000/api/csv-query', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -39,6 +40,7 @@
             }
 
             const data = await response.json();
+            result = data.result.output;
             chartData = data.chart_data; // Base64 encoded image
         } catch (e) {
             error = e instanceof Error ? e.message : 'Failed to generate analysis';
@@ -89,6 +91,7 @@
         {#if chartData}
             <div class="chart-section">
                 <h3>Analysis Results</h3>
+                <h4>Query: {result}</h4>
                 <div class="chart-container">
                     <img src={`data:image/png;base64,${chartData}`} alt="Analysis Chart" />
                 </div>
