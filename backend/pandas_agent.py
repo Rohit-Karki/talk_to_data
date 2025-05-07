@@ -19,6 +19,7 @@ def pandas_agent(df):
         verbose=True,
         agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
         # python_agent=python_agent,
+        agent_executor_kwargs={"handle_parsing_errors": True},
         allow_dangerous_code=True
     )
     return agent

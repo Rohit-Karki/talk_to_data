@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from State import State
 from execute_query import execute_query
 from generate_answer import generate_answer
-from analyze_data import generate_chart
+from generate_chart import generate_chart
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for all routes
@@ -90,19 +90,22 @@ def upload_file():
             print(f"Error uploading file: {str(e)}")
             return jsonify({'error': str(e)}), 500
 
-@app.route('/api/analyze', methods=['POST'])
-def analyze_data():
+@app.route('/api/analyze-charts', methods=['POST'])
+def analyze_charts():
     data = request.get_json()
+
     if not data or 'filename' not in data or 'query' not in data:
         return jsonify({'error': 'Missing filename or query'}), 400
+    # print("Received data for chart generation:", data)
     
     try:
-        chart_data = generate_chart(data['filename'], data['query'])
+        result = generate_chart(data['filename'], data['query'])
         return jsonify({
-            'message': 'Analysis completed successfully',
-            'chart_data': chart_data
+            'message': 'Generating Charts completed successfully',
+            'data': result
         })
     except Exception as e:
+        print(f"Error in analysis: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/csv-query', methods=['POST'])
@@ -112,10 +115,8 @@ def handle_csv_query():
         return jsonify({'error': 'Missing filename or question'}), 400
     
     try:
-        # Get the file from MinIO
-        print("Getting file from minio")
+        # Get the file from MinIO        
         response = minio_client.get_object(MINIO_BUCKET, data['filename'])
-        print("File found")
         
         # Read the CSV data into a BytesIO buffer
         csv_data = io.BytesIO(response.read())
