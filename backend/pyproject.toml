@@ -15,7 +15,9 @@ dependencies = [
     "python-dotenv",
     "matplotlib",
     "pandas",
-    "langchain_experimental"
+    "langchain_experimental",
+    "pydantic",
+    "plotly"
 ]
 
 [build-system]

@@ -1,1 +1,0 @@
-What is the total no of artists in the database?

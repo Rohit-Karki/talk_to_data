@@ -3,14 +3,14 @@ from langchain_experimental.agents.agent_toolkits import create_pandas_dataframe
 from llm import llm
 from langchain_experimental.agents.agent_toolkits import create_python_agent
 from langchain_experimental.tools.python.tool import PythonREPLTool
+from langchain_experimental.tools import PythonAstREPLTool
 
 def pandas_agent(df):
     # Create a Python agent for executing code
-    python_agent = create_python_agent(
-        llm=llm,
-        tool=PythonREPLTool(),
-        verbose=True
-    )
+    # python_agent = create_python_agent(
+    #     llm=llm,
+    #     verbose=True
+    # )
     
     # Create the pandas agent with the Python agent
     agent = create_pandas_dataframe_agent(
@@ -18,6 +18,7 @@ def pandas_agent(df):
         df=df,
         verbose=True,
         agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+        tool=PythonAstREPLTool(),
         # python_agent=python_agent,
         agent_executor_kwargs={"handle_parsing_errors": True},
         allow_dangerous_code=True
