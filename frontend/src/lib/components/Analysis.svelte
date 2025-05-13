@@ -119,57 +119,6 @@
 			{/each}
 		</ul>
 	</aside>
-	<aside class="analysis-sidebar-right">
-		<div class="tabs">
-			<button 
-				class="tab-button {activeTab === 'outline' ? 'active' : ''}" 
-				on:click={() => activeTab = 'outline'}
-			>
-				Outline
-			</button>
-			<button 
-				class="tab-button {activeTab === 'notes' ? 'active' : ''}" 
-				on:click={() => activeTab = 'notes'}
-			>
-				Notes
-			</button>
-			<button 
-				class="tab-button {activeTab === 'data-explorer' ? 'active' : ''}" 
-				on:click={() => activeTab = 'data-explorer'}
-			>
-				Data Explorer
-			</button>
-		</div>
-		<div class="tab-content">
-			{#if activeTab === 'outline'}
-				<div class="tab-pane">
-					<h3>Analysis Outline</h3>
-					<ul class="outline-list">
-						{#each threads as thread}
-							<li class="outline-item {thread.id === selectedThread.id ? 'active' : ''}" on:click={() => selectThread(thread)}>
-								<span class="outline-title">{thread.title}</span>
-								<span class="outline-time">{thread.lastUpdated}</span>
-							</li>
-						{/each}
-					</ul>
-				</div>
-			{:else if activeTab === 'notes'}
-				<div class="tab-pane">
-					<h3>Analysis Notes</h3>
-					<div class="notes-content">
-						<p>Add your analysis notes here...</p>
-					</div>
-				</div>
-			{:else if activeTab === 'data-explorer'}
-				<div class="tab-pane">
-					<h3>Data Explorer</h3>
-					<div class="data-explorer-content">
-						<p>Explore your data here...</p>
-					</div>
-				</div>
-			{/if}
-		</div>
-	</aside>
 
 	<div class="analysis-main">
 		<div class="analysis-header">
@@ -191,19 +140,28 @@
 					<div class="message assistant-message">
 						<div class="message-content">
 							{#if analysisResult.code_blocks && analysisResult.code_blocks.length > 0}
-								<div class="code-card">
-									<h3>Python Code</h3>
-									{#each analysisResult.code_blocks as codeBlock}
-										<Highlight langtag language={python} code={codeBlock.code} />
-									{/each}
+								<div class="code-block-card">
+									<div class="code-block-header">
+										<span class="python-icon">🐍</span>
+										<span class="python-label">Python</span>
+										<div class="code-block-actions">
+											<button class="code-action-btn">Rerun code</button>
+											<button class="code-action-btn">Edit code</button>
+										</div>
+									</div>
+									<div class="code-block-content">
+										{#each analysisResult.code_blocks as codeBlock}
+											<Highlight langtag language={python} code={codeBlock.code} />
+										{/each}
+									</div>
 								</div>
 							{/if}
 
 							{#if analysisResult.explanations && analysisResult.explanations.length > 0}
 								{#each analysisResult.explanations as explanation}
-									<div class="code-card">
-										<h3>{explanation.type.charAt(0).toUpperCase() + explanation.type.slice(1)} Explanation</h3>
-										<div class="chart-description">
+									<div class="code-explanation-card">
+										<div class="explanation-title">Code Explanation</div>
+										<div class="explanation-content">
 											<SvelteMarkdown source={explanation.text} />
 										</div>
 									</div>
@@ -255,6 +213,7 @@
 				{/if}
 			</div>
 		</div>
+		
 
 		<!-- Fixed bottom input bar -->
 		<div class="analysis-bottom-bar">
@@ -281,6 +240,58 @@
 			</button>
 		</div>
 	</div>
+
+	<aside class="analysis-sidebar-right">
+		<div class="tabs">
+			<button 
+				class="tab-button {activeTab === 'outline' ? 'active' : ''}" 
+				on:click={() => activeTab = 'outline'}
+			>
+				Outline
+			</button>
+			<button 
+				class="tab-button {activeTab === 'notes' ? 'active' : ''}" 
+				on:click={() => activeTab = 'notes'}
+			>
+				Notes
+			</button>
+			<button 
+				class="tab-button {activeTab === 'data-explorer' ? 'active' : ''}" 
+				on:click={() => activeTab = 'data-explorer'}
+			>
+				Data Explorer
+			</button>
+		</div>
+		<div class="tab-content">
+			{#if activeTab === 'outline'}
+				<div class="tab-pane">
+					<h3>Analysis Outline</h3>
+					<ul class="outline-list">
+						{#each threads as thread}
+							<li class="outline-item {thread.id === selectedThread.id ? 'active' : ''}" on:click={() => selectThread(thread)}>
+								<span class="outline-title">{thread.title}</span>
+								<span class="outline-time">{thread.lastUpdated}</span>
+							</li>
+						{/each}
+					</ul>
+				</div>
+			{:else if activeTab === 'notes'}
+				<div class="tab-pane">
+					<h3>Analysis Notes</h3>
+					<div class="notes-content">
+						<p>Add your analysis notes here...</p>
+					</div>
+				</div>
+			{:else if activeTab === 'data-explorer'}
+				<div class="tab-pane">
+					<h3>Data Explorer</h3>
+					<div class="data-explorer-content">
+						<p>Explore your data here...</p>
+					</div>
+				</div>
+			{/if}
+		</div>
+	</aside>
 </div>
 
 <style>
@@ -293,7 +304,7 @@
 	}
 
 	.analysis-sidebar-left {
-		position: absolute;
+		/* position: absolute; */
 		width: 300px;
 		background: #fff;
 		border-right: 1px solid #e0e0e0;
@@ -304,7 +315,7 @@
 		bottom: 0;
 	}
 	.analysis-sidebar-right {
-		position: absolute;
+		/* position: absolute; */
 		width: 400px;
 		background: #fff;
 		border-right: 1px solid #e0e0e0;
@@ -392,26 +403,82 @@
 		flex-wrap: wrap;
 	}
 
-	.code-card, .chart-card {
-		background: #f9fafb;
-		border-radius: 8px;
-		box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-		padding: 1.5rem;
-		flex: 1 1 350px;
-		min-width: 320px;
+	.code-block-card {
+		background: #181c23;
+		border-radius: 12px;
+		box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+		padding: 0;
+		margin-bottom: 1.5rem;
+		overflow: hidden;
 	}
-	.code-card h3, .chart-card h3 {
-		margin-top: 0;
-		font-size: 1.1rem;
-		color: #222;
+
+	.code-block-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		background: #23272f;
+		padding: 0.75rem 1.2rem;
+		border-bottom: 1px solid #23272f;
 	}
-	.chart-card img {
-		max-width: 100%;
-		height: auto;
+
+	.python-icon {
+		font-size: 1.3rem;
+		margin-right: 0.5rem;
+	}
+
+	.python-label {
+		font-weight: 700;
+		color: #ffd43b;
+		font-size: 1.05rem;
+		margin-right: auto;
+	}
+
+	.code-block-actions {
+		display: flex;
+		gap: 0.5rem;
+	}
+
+	.code-action-btn {
+		background: #23272f;
+		color: #bdbdbd;
+		border: 1px solid #353b45;
 		border-radius: 6px;
+		padding: 0.3rem 0.8rem;
+		font-size: 0.95rem;
+		cursor: pointer;
+		transition: background 0.2s;
+	}
+	.code-action-btn:hover {
+		background: #353b45;
+		color: #fff;
+	}
+
+	.code-block-content {
+		padding: 1.2rem;
+		background: #181c23;
+		font-family: 'Fira Mono', 'Consolas', 'Menlo', monospace;
+		font-size: 1rem;
+		color: #e6e6e6;
+		border-radius: 0 0 12px 12px;
+	}
+
+	.code-explanation-card {
+		background: #23272f;
+		border-radius: 10px;
 		margin-top: 1rem;
-		background: #fff;
-		box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+		padding: 1.2rem 1.5rem;
+	}
+
+	.explanation-title {
+		font-weight: 700;
+		color: #fff;
+		font-size: 1.08rem;
+		margin-bottom: 0.5rem;
+	}
+
+	.explanation-content {
+		color: #e6e6e6;
+		font-size: 1rem;
 	}
 
 	.analysis-bottom-bar {
@@ -487,7 +554,12 @@
 		.analysis-layout {
 			flex-direction: column;
 		}
-		.analysis-sidebar {
+		.analysis-sidebar-left {
+			width: 100%;	
+			border-right: none;
+			border-bottom: 1px solid #e0e0e0;
+		}
+		.analysis-sidebar-right {
 			width: 100%;
 			border-right: none;
 			border-bottom: 1px solid #e0e0e0;
@@ -508,31 +580,41 @@
 		}
 	}
 	.table-card {
-		background: #f9fafb;
-		border-radius: 8px;
-		box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+		background: #22272e;
+		border-radius: 10px;
+		box-shadow: 0 2px 8px rgba(0,0,0,0.08);
 		padding: 1.5rem;
-		flex: 1 1 100%;
-		min-width: 320px;
 		margin-top: 1rem;
+		overflow-x: auto;
 	}
 	.table-card table {
 		width: 100%;
-		border-collapse: collapse;
-		margin-top: 1rem;
-		background: white;
-		border-radius: 6px;
+		border-collapse: separate;
+		border-spacing: 0;
+		background: #22272e;
+		border-radius: 10px;
 		overflow: hidden;
 	}
 	.table-card th, .table-card td {
-		padding: 0.75rem;
+		padding: 0.85rem 1.2rem;
 		text-align: left;
-		border-bottom: 1px solid #e0e0e0;
 	}
 	.table-card th {
-		background: #f0f4ff;
-		font-weight: 600;
-		color: #1e40af;
+		background: #2d333b;
+		color: #fff;
+		font-weight: 700;
+		border-bottom: 2px solid #444c56;
+	}
+	.table-card td {
+		background: #22272e;
+		color: #e6e6e6;
+		border-bottom: 1px solid #2d333b;
+	}
+	.table-card tr:nth-child(even) td {
+		background: #23272f;
+	}
+	.table-card tr:hover td {
+		background: #2d333b;
 	}
 	.table-card tr:last-child td {
 		border-bottom: none;
@@ -676,7 +758,7 @@
 		margin-top: 0.5rem;
 	}
 
-	.assistant-message .code-card,
+	.assistant-message .code-block-card,
 	.assistant-message .chart-card,
 	.assistant-message .table-card {
 		background: transparent;
@@ -685,7 +767,9 @@
 		margin-top: 1rem;
 	}
 
-	.assistant-message .code-card h3,
+	.assistant-message .code-block-card .code-block-header,
+	.assistant-message .code-block-card .code-block-content,
+	.assistant-message .code-block-card .code-action-btn,
 	.assistant-message .chart-card h3,
 	.assistant-message .table-card h3 {
 		color: #1f2937;
