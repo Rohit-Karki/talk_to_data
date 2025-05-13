@@ -18,6 +18,10 @@ from generate_chart import generate_chart
 from analysis_router import route_analysis
 from flask import send_file
 from llm import llm
+from langchain.output_parsers import PydanticOutputParser
+from pydantic import BaseModel, Field
+from typing import List
+from langchain.prompts import PromptTemplate
 
 
 app = Flask(__name__)
@@ -108,32 +112,59 @@ def upload_file():
             print(f"Error uploading file: {str(e)}")
             return jsonify({'error': str(e)}), 500
 
+class ContentDescription(BaseModel):
+    data_type: str = Field(description="Type of data in the dataset")
+    key_columns: List[str] = Field(description="List of key columns and their purposes")
+    patterns: List[str] = Field(description="Notable patterns or characteristics")
+    use_cases: List[str] = Field(description="Potential use cases for this data")
+    summary: str = Field(description="A concise 2-3 sentence summary of the dataset")
+
 def generate_content_description(df):
     """Generate a natural language description of the CSV content using LLM."""
     try:
         # Prepare the data for the prompt
         sample_data = df.head(3).to_dict(orient='records')
         
-        prompt = f"""You are a data analyst. Analyze this dataset and provide a concise but informative description.
-        Focus on:
-        1. What kind of data this appears to be
-        2. Key columns and their purposes
-        3. Any notable patterns or characteristics
-        4. Potential use cases for this data
-        5. Convert NaN values to null
+        # Create parser and prompt template
+        parser = PydanticOutputParser(pydantic_object=ContentDescription)
         
-        Dataset Information:
-        Number of rows: {len(df)}
-        Number of columns: {len(df.columns)}
-        Column names: {df.columns.tolist()}
-        Data types: {df.dtypes.astype(str).to_dict()}
-        Sample data (first 3 rows): {sample_data}
+        prompt = PromptTemplate(
+            template="""You are a data analyst. Analyze this dataset and provide a structured description.
+            Focus on:
+            1. What kind of data this appears to be
+            2. Key columns and their purposes
+            3. Any notable patterns or characteristics
+            4. Potential use cases for this data
+            5. Convert NaN values to null
+            
+            Dataset Information:
+            Number of rows: {rows}
+            Number of columns: {columns}
+            Column names: {column_names}
+            Data types: {dtypes}
+            Sample data (first 3 rows): {sample_data}
+            
+            {format_instructions}
+            """,
+            input_variables=["rows", "columns", "column_names", "dtypes", "sample_data"],
+            partial_variables={"format_instructions": parser.get_format_instructions()}
+        )
         
-        Provide a clear, concise description in 2-3 sentences."""
+        # Format and invoke the prompt
+        formatted_prompt = prompt.format(
+            rows=len(df),
+            columns=len(df.columns),
+            column_names=df.columns.tolist(),
+            dtypes=df.dtypes.astype(str).to_dict(),
+            sample_data=sample_data
+        )
         
-        # Generate the description using the existing LLM
-        response = llm.invoke(prompt)
-        return response.content
+        # Generate and parse the response
+        response = llm.invoke(formatted_prompt)
+        result = parser.parse(response.content)
+        
+        # Return a formatted string representation
+        return f"{result.summary}\n\nKey columns: {', '.join(result.key_columns)}\nPatterns: {', '.join(result.patterns)}\nUse cases: {', '.join(result.use_cases)}"
         
     except Exception as e:
         print(f"Error generating content description: {str(e)}")
@@ -223,7 +254,7 @@ def handle_csv_query():
         print("Agent created successfully")
         # Run the query
         result = execute_analysis_query(data['filename'], data['query'])
-        
+        print("Result: ", result)
         if 'error' in result:
             return jsonify(result), 500
             

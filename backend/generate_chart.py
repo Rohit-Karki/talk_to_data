@@ -3,6 +3,7 @@ import base64
 import re
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 import numpy as np
 from datetime import datetime
 from minio_config import minio_client, MINIO_BUCKET
@@ -13,248 +14,51 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Union
 import plotly.graph_objects as go
 import os
+from chart_generation.models import AnalysisResult, CodeBlock, Explanation, Visualization
+from chart_generation.markdown_parser import (
+    extract_code_from_markdown,
+    extract_code_explanation,
+    extract_chart_explanation,
+    extract_data_table
+)
+from chart_generation.chart_utils import (
+    determine_chart_type,
+    setup_plot_style,
+    determine_code_type
+)
+from langchain.output_parsers import PydanticOutputParser
+from langchain.prompts import PromptTemplate
 
 # Define the data models
-class CodeBlock(BaseModel):
-    code: str
-    type: str = Field(..., description="Type of code block (visualization, eda, correlation, etc.)")
-    language: str = "python"
-
-class Explanation(BaseModel):
-    text: str
-    type: str = Field(..., description="Type of explanation (code, chart, data)")
-    section: Optional[str] = None
-
 class DataTable(BaseModel):
     headers: List[str]
     data: List[Dict[str, Union[str, float, int]]]
     title: Optional[str] = None
     description: Optional[str] = None
 
-class Visualization(BaseModel):
-    type: str = Field(..., description="Type of visualization (line, bar, scatter, etc.)")
-    title: str
-    description: str
-    data: Dict[str, Union[str, float, int]]
-    config: Optional[Dict] = None
-
-class AnalysisResult(BaseModel):
-    code_blocks: List[CodeBlock]
-    explanations: List[Explanation]
-    data_tables: List[DataTable]
-    visualizations: List[Visualization]
-    metadata: Dict[str, Union[List[str], tuple]]
-    timestamp: datetime = Field(default_factory=datetime.now)
-
-def extract_data_table(md_text: str) -> List[DataTable]:
-    """
-    Extract data tables from markdown text.
-    
-    Args:
-        md_text (str): Markdown text containing the data table
-        
-    Returns:
-        List[DataTable]: List of extracted data tables
-    """
-    # Look for text between Data Table: and the next section
-    matches = re.findall(r"Data Table:\s*(.*?)(?=Code Explanation:|Chart Explanation:|$)", 
-                        md_text, re.DOTALL | re.IGNORECASE)
-    
-    if not matches:
-        return []
-    
-    tables = []
-    for match in matches:
-        # Clean up the extracted text
-        table_text = match.strip()
-        # Remove any remaining markdown code block markers
-        table_text = re.sub(r'```.*?```', '', table_text, flags=re.DOTALL)
-        
-        # Try to parse the table data
-        try:
-            # Split into lines and remove empty lines
-            lines = [line.strip() for line in table_text.split('\n') if line.strip()]
-            if len(lines) < 2:  # Need at least header and one row
-                continue
-                
-            # First line is headers
-            headers = [h.strip() for h in lines[0].split('|') if h.strip()]
-            if not headers:
-                continue
-                
-            # Parse data rows
-            data = []
-            for line in lines[1:]:
-                row = [cell.strip() for cell in line.split('|') if cell.strip()]
-                if len(row) == len(headers):
-                    # Convert string values to appropriate types
-                    processed_row = {}
-                    for header, value in zip(headers, row):
-                        try:
-                            # Try to convert to number if possible
-                            if '.' in value:
-                                processed_row[header] = float(value)
-                            else:
-                                processed_row[header] = int(value)
-                        except ValueError:
-                            processed_row[header] = value
-                    data.append(processed_row)
-            
-            if data:
-                tables.append(DataTable(
-                    headers=headers,
-                    data=data,
-                    title="Analysis Data Table",
-                    description="Data used in the analysis"
-                ))
-        except Exception as e:
-            print(f"Error parsing table: {str(e)}")
-            continue
-    
-    return tables
-
 def parse_llm_response(response_text: str) -> AnalysisResult:
-    """
-    Parse the LLM response into structured output using Pydantic models.
-    """
-    # Initialize lists for different components
-    code_blocks = []
-    explanations = []
-    data_tables = []
-    visualizations = []
+    """Parse the LLM response into structured output using LangChain's PydanticOutputParser."""
+    parser = PydanticOutputParser(pydantic_object=AnalysisResult)
     
-    # Extract code blocks
-    code = extract_code_from_markdown(response_text)
-    code_blocks.append(CodeBlock(
-        code=code,
-        type=determine_code_type(code)
-    ))
-    
-    # Extract explanations
-    code_explanation = extract_code_explanation(response_text)
-    if code_explanation:
-        explanations.append(Explanation(
-            text=code_explanation,
-            type="code"
-        ))
-    
-    chart_explanation = extract_chart_explanation(response_text)
-    if chart_explanation:
-        explanations.append(Explanation(
-            text=chart_explanation,
-            type="chart"
-        ))
-    
-    # Extract data tables
-    data_tables = extract_data_table(response_text)
-    
-    return AnalysisResult(
-        code_blocks=code_blocks,
-        explanations=explanations,
-        data_tables=data_tables,
-        visualizations=visualizations,
-        metadata={}
+    # Create a prompt template that includes format instructions
+    prompt = PromptTemplate(
+        template="""Analyze the following response and structure it according to the schema:
+        {response_text}
+        
+        {format_instructions}
+        """,
+        input_variables=["response_text"],
+        partial_variables={"format_instructions": parser.get_format_instructions()}
     )
-
-def extract_chart_explanation(md_text: str) -> str:
-    """
-    Extract chart explanation from markdown text.
     
-    Args:
-        md_text (str): Markdown text containing the chart explanation
-        
-    Returns:
-        str: The extracted chart explanation
-    """
-    # Look for text between Chart Explanation: and the next section
-    matches = re.findall(r"Chart Explanation:\s*(.*?)(?=Code Explanation:|Data Table:|$)", 
-                        md_text, re.DOTALL | re.IGNORECASE)
-    
-    if not matches:
-        return ""  # Return empty string if no chart explanation found
-    
-    # Clean up the extracted text
-    explanation = matches[0].strip()
-    # Remove any remaining markdown code block markers
-    explanation = re.sub(r'```.*?```', '', explanation, flags=re.DOTALL)
-    return explanation.strip()
-
-def extract_code_explanation(md_text: str) -> str:
-    """
-    Extract code explanation from markdown text.
-    
-    Args:
-        md_text (str): Markdown text containing the code explanation
-        
-    Returns:
-        str: The extracted code explanation
-    """
-    # Look for text between Code Explanation: and the next section
-    matches = re.findall(r"Code Explanation:\s*(.*?)(?=Chart Explanation:|Data Table:|$)", 
-                        md_text, re.DOTALL | re.IGNORECASE)
-    
-    if not matches:
-        return ""  # Return empty string if no code explanation found
-    
-    # Clean up the extracted text
-    explanation = matches[0].strip()
-    # Remove any remaining markdown code block markers
-    explanation = re.sub(r'```.*?```', '', explanation, flags=re.DOTALL)
-    return explanation.strip()
-
-def determine_chart_type(query: str) -> str:
-    """Determine the most appropriate chart type based on the query."""
-    query = query.lower()
-    if any(word in query for word in ['trend', 'time', 'line']):
-        return 'line'
-    elif any(word in query for word in ['distribution', 'histogram', 'density']):
-        return 'histogram'
-    elif any(word in query for word in ['scatter', 'correlation', 'relationship']):
-        return 'scatter'
-    elif any(word in query for word in ['pie', 'proportion', 'percentage']):
-        return 'pie'
-    elif any(word in query for word in ['box', 'quartile', 'outlier']):
-        return 'box'
-    else:
-        return 'bar'
-
-def setup_plot_style():
-    """Set up consistent plot styling."""
-    # plt.style.use('seaborn')
-    plt.rcParams['figure.facecolor'] = '#F0F0F0'
-    plt.rcParams['axes.facecolor'] = '#F0F0F0'
-    plt.rcParams['axes.grid'] = True
-    plt.rcParams['grid.color'] = '#FFFFFF'
-    plt.rcParams['grid.alpha'] = 0.3
-
-def extract_code_from_markdown(md_text: str) -> str:
-    """
-    Extract Python code from markdown text.
-
-    Args:
-        md_text (str): Markdown text containing the code
-
-    Returns:
-        str: The extracted Python code
-    """
-    # First try to find code blocks with python specified
-    code_blocks = re.findall(r"```python\n(.*?)```", md_text, re.DOTALL)
-    if not code_blocks:
-        # If no python-specific blocks found, try any code blocks
-        code_blocks = re.findall(r"```\n(.*?)```", md_text, re.DOTALL)
-    if not code_blocks:
-        # If still no blocks found, try blocks without newlines
-        code_blocks = re.findall(r"```(.*?)```", md_text, re.DOTALL)
-    
-    if not code_blocks:
-        raise ValueError(f"No code blocks found in response. Raw response:\n{md_text}")
-    
-    return "\n".join([block.strip() for block in code_blocks])
+    # Parse the response using the LLM and parser
+    formatted_prompt = prompt.format(response_text=response_text)
+    response = llm.invoke(formatted_prompt)
+    print(f"response: {response}")
+    return parser.parse(response.content)
 
 def generate_chart(filename: str, query: str) -> AnalysisResult:
-    """
-    Generate chart and analysis with structured output.
-    """
+    """Generate chart and analysis with structured output."""
     try:
         # Get the file from MinIO
         data = minio_client.get_object(MINIO_BUCKET, filename)
@@ -270,6 +74,43 @@ def generate_chart(filename: str, query: str) -> AnalysisResult:
         Create Python code that generates visualization(s) using matplotlib to address this query:
         {query}
         
+        You are an experiencied data scientist
+        Lets think step by step of why the next action has sense and if there is something to take in account
+        
+        At the first steps:
+            1. Import libraries that you are going to use for data as pandas, numpy and matplotlib
+            2. Check if the dataframe `df` exists and inspect its structure and content
+            3. Remove non necessary columns
+            4. Drop duplicate rows
+            
+        For intermediate steps during all iterations, use the following procedure:
+            (1) First identify the possible solutions and possible blocks of the thought
+            (2) If theres is Empty DataFrame, review your previous observation and see if you fail and where
+            (3) If you are making new columns or operations, make sure the values you are going to use exists before using it
+            
+        Then check the following advices:
+            1. Find the corresponding metrics, not necessarily the names is exactly equal as the human requested
+            2. Check if is necessary to change format of table with pivot, groupby, melt, or other function over the table. When making this changes
+            make sure the table is well processed
+            3. When generating a new dataset return it to be observed, if necessary, print it
+                    
+
+        Use the following format:
+
+        Question: the input question you must answer
+        you should always think about what to do in as possible paths
+        Thought1: thinks this as the first possibility path
+        Thought2: thinks this as the second possibility path
+        Thought: which is the best thougth to take action
+        Action: python_repl_ast
+        Action Input: the input to the action
+        Observation: the result of the action
+        Remember to maintain the format specifically think about Thougth1 and Thought2
+        ... (this Thought1/Thought2/Action/Action Input/Observation can repeat N times)
+        Final Thought: I now know the final answer and processed the data correctly
+        Final Answer: the final answer to the original input question
+
+
         Requirements:
         1. Use ONLY matplotlib for plotting
         2. The code must be a SINGLE code block
@@ -334,6 +175,8 @@ def generate_chart(filename: str, query: str) -> AnalysisResult:
            - Ensure consistent styling across all charts
            - Provide separate explanations for each chart
            - Include a summary of how the charts relate to each other
+        
+        Begin!
         """
         
         # Get the response from the agent
@@ -343,10 +186,11 @@ def generate_chart(filename: str, query: str) -> AnalysisResult:
         analysis_result = parse_llm_response(response['output'])
         print(f"analysis_result: {analysis_result}")
         
+        print(f"code blocks are {analysis_result.code_blocks}")
         # Execute code blocks and update visualizations
         for code_block in analysis_result.code_blocks:
             if code_block.type == 'visualization':
-                local_vars = {'df': df, 'plt': plt, 'np': np}
+                local_vars = {'df': df, 'plt': plt, 'mdates': mdates, 'np': np}
                 
                 try:
                     # Execute the code
@@ -354,6 +198,7 @@ def generate_chart(filename: str, query: str) -> AnalysisResult:
                     
                     # Get the current figure
                     fig = plt.gcf()
+                    print(f"fig: {fig}")
                     if fig and fig.get_size_inches().prod() > 0:  # Check if figure has content
                         # Save to buffer
                         buf = io.BytesIO()

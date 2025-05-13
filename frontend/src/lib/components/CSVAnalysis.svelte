@@ -23,12 +23,6 @@
 	let error: string | null = null;
 	let result: any = null;
 	let analysisResult: any = null;
-	let chart_explanation: string | null = null; // Explanation of the chart
-	let code_explanation: string | null = null; // Explanation of the code
-	let chartData: string | null = null; // Base64 encoded image data
-	let pythonCode: string | null = null; // Python code for the chart
-	let isChart: boolean = false; // Flag to indicate if the response is a chart
-	let activeTab = 'outline'; // Add this line near the top of the script section
 
 	async function handleFileUpload(event: CustomEvent<{ filename: string }>) {
 		selectedFile = event.detail.filename;
@@ -45,11 +39,6 @@
 		selectedThread = thread;
 		// Reset state for demo
 		result = null;
-		chartData = null;
-		pythonCode = null;
-		isChart = false;
-		chart_explanation = null;
-		code_explanation = null;
 		error = null;
 		analysisQuery = '';
 	}
@@ -66,7 +55,7 @@
 		analysisResult = null;
 
 		try {
-			const response = await fetch('http://localhost:5000/api/analyze', {
+			const response = await fetch('http://localhost:5000/api/csv-query', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
@@ -82,7 +71,7 @@
 			}
 			
 			const data = await response.json();
-			analysisResult = data.data;
+			analysisResult = data;
 			console.log('analysisResult', analysisResult);
 			
 			// Update thread with new analysis
@@ -118,58 +107,7 @@
 				</button>
 			{/each}
 		</ul>
-	</aside>
-	<aside class="analysis-sidebar-right">
-		<div class="tabs">
-			<button 
-				class="tab-button {activeTab === 'outline' ? 'active' : ''}" 
-				on:click={() => activeTab = 'outline'}
-			>
-				Outline
-			</button>
-			<button 
-				class="tab-button {activeTab === 'notes' ? 'active' : ''}" 
-				on:click={() => activeTab = 'notes'}
-			>
-				Notes
-			</button>
-			<button 
-				class="tab-button {activeTab === 'data-explorer' ? 'active' : ''}" 
-				on:click={() => activeTab = 'data-explorer'}
-			>
-				Data Explorer
-			</button>
-		</div>
-		<div class="tab-content">
-			{#if activeTab === 'outline'}
-				<div class="tab-pane">
-					<h3>Analysis Outline</h3>
-					<ul class="outline-list">
-						{#each threads as thread}
-							<li class="outline-item {thread.id === selectedThread.id ? 'active' : ''}" on:click={() => selectThread(thread)}>
-								<span class="outline-title">{thread.title}</span>
-								<span class="outline-time">{thread.lastUpdated}</span>
-							</li>
-						{/each}
-					</ul>
-				</div>
-			{:else if activeTab === 'notes'}
-				<div class="tab-pane">
-					<h3>Analysis Notes</h3>
-					<div class="notes-content">
-						<p>Add your analysis notes here...</p>
-					</div>
-				</div>
-			{:else if activeTab === 'data-explorer'}
-				<div class="tab-pane">
-					<h3>Data Explorer</h3>
-					<div class="data-explorer-content">
-						<p>Explore your data here...</p>
-					</div>
-				</div>
-			{/if}
-		</div>
-	</aside>
+	</aside>	
 
 	<div class="analysis-main">
 		<div class="analysis-header">
@@ -190,65 +128,9 @@
 					</div>
 					<div class="message assistant-message">
 						<div class="message-content">
-							{#if analysisResult.code_blocks && analysisResult.code_blocks.length > 0}
-								<div class="code-card">
-									<h3>Python Code</h3>
-									{#each analysisResult.code_blocks as codeBlock}
-										<Highlight langtag language={python} code={codeBlock.code} />
-									{/each}
-								</div>
-							{/if}
-
-							{#if analysisResult.explanations && analysisResult.explanations.length > 0}
-								{#each analysisResult.explanations as explanation}
-									<div class="code-card">
-										<h3>{explanation.type.charAt(0).toUpperCase() + explanation.type.slice(1)} Explanation</h3>
-										<div class="chart-description">
-											<SvelteMarkdown source={explanation.text} />
-										</div>
-									</div>
-								{/each}
-							{/if}
-
-							{#if analysisResult.visualizations && analysisResult.visualizations.length > 0}
-								{#each analysisResult.visualizations as visualization}
-									<div class="chart-card">
-										<h3>{visualization.title}</h3>
-										<img src={visualization.data.url || `data:image/png;base64,${visualization.data.image}`} alt={visualization.title} />
-										{#if visualization.description}
-											<SvelteMarkdown source={visualization.description} />
-										{/if}
-									</div>
-								{/each}
-							{/if}
-
-							{#if analysisResult.data_tables && analysisResult.data_tables.length > 0}
-								{#each analysisResult.data_tables as table}
-									<div class="table-card">
-										<h3>{table.title || 'Data Table'}</h3>
-										{#if table.description}
-											<p class="table-description">{table.description}</p>
-										{/if}
-										<table>
-											<thead>
-												<tr>
-													{#each table.headers as header}
-														<th>{header}</th>
-													{/each}
-												</tr>
-											</thead>
-											<tbody>
-												{#each table.data as row}
-													<tr>
-														{#each table.headers as header}
-															<td>{row[header]}</td>
-														{/each}
-													</tr>
-												{/each}
-											</tbody>
-										</table>
-									</div>
-								{/each}
+							{#if analysisResult.output}
+								<p>{analysisResult.message}</p>
+								<p>{analysisResult.output}</p>
 							{/if}
 						</div>
 					</div>
@@ -673,31 +555,6 @@
 	}
 
 	.message-content p + p {
-		margin-top: 0.5rem;
-	}
-
-	.assistant-message .code-card,
-	.assistant-message .chart-card,
-	.assistant-message .table-card {
-		background: transparent;
-		box-shadow: none;
-		padding: 0;
-		margin-top: 1rem;
-	}
-
-	.assistant-message .code-card h3,
-	.assistant-message .chart-card h3,
-	.assistant-message .table-card h3 {
-		color: #1f2937;
-		font-size: 1rem;
-		margin-bottom: 0.5rem;
-	}
-
-	.assistant-message .chart-card img {
-		margin-top: 0.5rem;
-	}
-
-	.assistant-message .table-card table {
 		margin-top: 0.5rem;
 	}
 </style>
