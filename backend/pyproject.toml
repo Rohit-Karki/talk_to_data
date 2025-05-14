@@ -7,8 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "langchain-community>=0.3.23",
     "langchain-core>=0.3.58",
-    "langchain[google-genai]>=0.3.25",
-    "langchain-openai",
+    "langchain[google-genai]>=0.3.25",    
     "langgraph>=0.4.1",
     "flask>=3.0.0",
     "flask-cors>=4.0.0",
@@ -19,9 +18,58 @@ dependencies = [
     "langchain_experimental",
     "pydantic",
     "plotly",
-    "faiss-cpu"    
+    "langchain-cohere"          
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+
+[project.optional-dependencies]
+nvidia = [
+    # workaround for pytorch/pytorch#145021 and astral-sh/uv#10693
+    "nvidia-cuda-nvrtc-cu12 == 12.6.77",
+    "nvidia-cuda-runtime-cu12 == 12.6.77",
+    "nvidia-cuda-cupti-cu12 == 12.6.80",
+    "nvidia-cudnn-cu12 == 9.5.1.17",
+    "nvidia-cublas-cu12 == 12.6.4.1",
+    "nvidia-cufft-cu12 == 11.3.0.4",
+    "nvidia-curand-cu12 == 10.3.7.77",
+    "nvidia-cusolver-cu12 == 11.7.1.2",
+    "nvidia-cusparse-cu12 == 12.5.4.2",
+    "nvidia-cusparselt-cu12 == 0.6.3",
+    "nvidia-nccl-cu12 == 2.21.5",
+    "nvidia-nvtx-cu12 == 12.6.77",
+    "nvidia-nvjitlink-cu12 == 12.6.85",
+]
+torch = [
+    "torch",
+    "torchao",
+    "torchaudio",
+    "torchvision",
+]
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-nightly-cu126" }]
+torchvision = [{ index = "pytorch-nightly-cu126" }]
+torchaudio = [{ index = "pytorch-nightly-cu126" }]
+torchao = [{ index = "pytorch-nightly-cu126" }]
+nvidia-cuda-nvrtc-cu12 = [{ index = "pytorch-nightly-cu126" }]
+nvidia-cuda-runtime-cu12 = [{ index = "pytorch-nightly-cu126" }]
+nvidia-cuda-cupti-cu12 = [{ index = "pytorch-nightly-cu126" }]
+nvidia-cudnn-cu12 = [{ index = "pytorch-nightly-cu126" }]
+nvidia-cublas-cu12 = [{ index = "pytorch-nightly-cu126" }]
+nvidia-cufft-cu12 = [{ index = "pytorch-nightly-cu126" }]
+nvidia-curand-cu12 = [{ index = "pytorch-nightly-cu126" }]
+nvidia-cusolver-cu12 = [{ index = "pytorch-nightly-cu126" }]
+nvidia-cusparse-cu12 = [{ index = "pytorch-nightly-cu126" }]
+nvidia-cusparselt-cu12 = [{ index = "pytorch-nightly-cu126" }]
+nvidia-nccl-cu12 = [{ index = "pytorch-nightly-cu126" }]
+nvidia-nvtx-cu12 = [{ index = "pytorch-nightly-cu126" }]
+nvidia-nvjitlink-cu12 = [{ index = "pytorch-nightly-cu126" }]
+
+[[tool.uv.index]]
+name = "pytorch-nightly-cu126"
+url = "https://download.pytorch.org/whl/nightly/cu126"
+explicit = true

@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 from typing import List
 from langchain.prompts import PromptTemplate
 from datetime import datetime
+from rag_query import SMSRetriever
 import json
 import sqlite3
 from rag_query import rag_query
@@ -100,6 +101,8 @@ def get_db():
     conn = sqlite3.connect('data/analysis.db')
     conn.row_factory = sqlite3.Row  # This enables column access by name
     return conn
+
+retriever = SMSRetriever("sms_data.csv")
 
 @app.route('/api/query', methods=['POST'])
 def handle_query():
@@ -576,7 +579,7 @@ def handle_rag_query():
     if not data or 'question' not in data:
         return jsonify({'error': 'Missing filename or question'}), 400
     try:
-        answer = rag_query('sms_data.csv', data['question'])
+        answer = retriever.query(data['question'])
         return jsonify({'answer': answer})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
