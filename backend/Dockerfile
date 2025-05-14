@@ -7,12 +7,15 @@ RUN apt-get update && apt-get install -y \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+ENV UV_HTTP_TIMEOUT=600
+
 # Install uv using pip
 RUN pip install --no-cache-dir uv chardet tabulate
 
 # Copy requirements first to leverage Docker cache
 COPY pyproject.toml .
 COPY uv.lock .
+
 
 # Install Python dependencies using uv
 RUN uv pip compile pyproject.toml > requirements.txt && \

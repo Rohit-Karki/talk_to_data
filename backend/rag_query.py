@@ -1,14 +1,13 @@
+import os
+import io
 import pandas as pd
-from langchain_community.vectorstores import FAISS
 from langchain_core.vectorstores import InMemoryVectorStore
-from langchain_openai import OpenAIEmbeddings
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_core.documents import Document
-from llm import llm
-import os
 from configs.minio_config import minio_client, MINIO_BUCKET
-import io
+from langchain_cohere import CohereEmbeddings
+
+from llm import llm
 
 # Helper to load CSV from MinIO or local
 
@@ -21,43 +20,6 @@ def load_sms_csv(filename: str) -> pd.DataFrame:
     return pd.read_csv(csv_data)
 
 # RAG pipeline
-
-def rag_query(filename: str, question: str, k: int = 5) -> str:
-    df = load_sms_csv(filename)
-    # Each SMS is a chunk
-    docs = [Document(page_content=row['SMS_text'], metadata={"row": i}) for i, row in df.iterrows()]
-    
-    embeddings = HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2",
-        model_kwargs={"device": "cpu"}
-    )
-
-    # embeddings = OpenAIEmbeddings(
-    #     model="text-embedding-3-large",
-    #     # With the `text-embedding-3` class
-    #     # of models, you can specify the size
-    #     # of the embeddings you want returned.
-    #     # dimensions=1024
-    # )
-    # embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-exp-03-07")
-    # vectorstore = FAISS.from_documents(docs, embeddings)
-    vector_store = InMemoryVectorStore(embeddings)
-    # Retrieve top-k relevant SMS
-    relevant_docs = vector_store.similarity_search(question, k=k)
-    context = "\n".join([doc.page_content for doc in relevant_docs])
-    prompt = f"""
-You are an assistant for answering questions about financial SMS data. Use the following SMS messages as context to answer the user's question. If the answer is not in the context, say you don't know.
-
-Context:
-{context}
-
-Question: {question}
-Answer as concisely as possible:
-"""
-    response = llm.invoke(prompt)
-    return response.content.strip() 
-
-
 class SMSRetriever:
     """A class for retrieving relevant SMS messages using RAG."""
     
@@ -88,13 +50,11 @@ class SMSRetriever:
                 for i, row in df.iterrows()]
         
         # Initialize embeddings model
-        embeddings = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2",
-            model_kwargs={"device": "cpu"}
-        )
+        embeddings = CohereEmbeddings(model="embed-english-v3.0")
         
         # Create vector store
-        self.vectorstore = FAISS.from_documents(docs, embeddings)
+        self.vectorstore = InMemoryVectorStore(embeddings)
+        _ = self.vectorstore.add_documents(documents=docs)
         print(f"Vector store initialized with {len(docs)} SMS messages")
     
     def query(self, question: str, k: int = 5) -> str:

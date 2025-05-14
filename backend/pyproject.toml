@@ -18,6 +18,7 @@ dependencies = [
     "langchain_experimental",
     "pydantic",
     "plotly",
+    "cohere",
     "langchain-cohere"          
 ]
 

@@ -32,17 +32,20 @@ charset-normalizer==3.4.2
     # via requests
 click==8.2.0
     # via flask
+cohere==5.15.0
+    # via
+    #   backend (pyproject.toml)
+    #   langchain-cohere
 contourpy==1.3.2
     # via matplotlib
 cycler==0.12.1
     # via matplotlib
 dataclasses-json==0.6.7
     # via langchain-community
+fastavro==1.10.0
+    # via cohere
 filelock==3.18.0
-    # via
-    #   huggingface-hub
-    #   torch
-    #   transformers
+    # via huggingface-hub
 filetype==1.2.0
     # via langchain-google-genai
 flask==3.1.1
@@ -58,9 +61,7 @@ frozenlist==1.6.0
     #   aiohttp
     #   aiosignal
 fsspec==2025.3.2
-    # via
-    #   huggingface-hub
-    #   torch
+    # via huggingface-hub
 google-ai-generativelanguage==0.6.18
     # via langchain-google-genai
 google-api-core==2.24.2
@@ -87,16 +88,15 @@ httpcore==1.0.9
     # via httpx
 httpx==0.28.1
     # via
+    #   cohere
     #   langgraph-sdk
     #   langsmith
 httpx-sse==0.4.0
-    # via langchain-community
-huggingface-hub==0.31.2
     # via
-    #   langchain-huggingface
-    #   sentence-transformers
-    #   tokenizers
-    #   transformers
+    #   cohere
+    #   langchain-community
+huggingface-hub==0.31.2
+    # via tokenizers
 idna==3.10
     # via
     #   anyio
@@ -106,11 +106,7 @@ idna==3.10
 itsdangerous==2.2.0
     # via flask
 jinja2==3.1.6
-    # via
-    #   flask
-    #   torch
-joblib==1.5.0
-    # via scikit-learn
+    # via flask
 jsonpatch==1.33
     # via langchain-core
 jsonpointer==3.0.0
@@ -121,18 +117,21 @@ langchain==0.3.25
     # via
     #   backend (pyproject.toml)
     #   langchain-community
+langchain-cohere==0.4.4
+    # via backend (pyproject.toml)
 langchain-community==0.3.24
     # via
     #   backend (pyproject.toml)
+    #   langchain-cohere
     #   langchain-experimental
 langchain-core==0.3.59
     # via
     #   backend (pyproject.toml)
     #   langchain
+    #   langchain-cohere
     #   langchain-community
     #   langchain-experimental
     #   langchain-google-genai
-    #   langchain-huggingface
     #   langchain-text-splitters
     #   langgraph
     #   langgraph-checkpoint
@@ -141,8 +140,6 @@ langchain-experimental==0.3.4
     # via backend (pyproject.toml)
 langchain-google-genai==2.1.4
     # via langchain
-langchain-huggingface==0.2.0
-    # via backend (pyproject.toml)
 langchain-text-splitters==0.3.8
     # via langchain
 langgraph==0.4.3
@@ -171,8 +168,6 @@ matplotlib==3.10.3
     # via backend (pyproject.toml)
 minio==7.2.15
     # via backend (pyproject.toml)
-mpmath==1.3.0
-    # via sympy
 multidict==6.4.3
     # via
     #   aiohttp
@@ -181,54 +176,12 @@ mypy-extensions==1.1.0
     # via typing-inspect
 narwhals==1.39.0
     # via plotly
-networkx==3.4.2
-    # via torch
 numpy==2.2.5
     # via
     #   contourpy
     #   langchain-community
     #   matplotlib
     #   pandas
-    #   scikit-learn
-    #   scipy
-    #   transformers
-nvidia-cublas-cu12==12.6.4.1
-    # via
-    #   nvidia-cudnn-cu12
-    #   nvidia-cusolver-cu12
-    #   torch
-nvidia-cuda-cupti-cu12==12.6.80
-    # via torch
-nvidia-cuda-nvrtc-cu12==12.6.77
-    # via torch
-nvidia-cuda-runtime-cu12==12.6.77
-    # via torch
-nvidia-cudnn-cu12==9.5.1.17
-    # via torch
-nvidia-cufft-cu12==11.3.0.4
-    # via torch
-nvidia-cufile-cu12==1.11.1.6
-    # via torch
-nvidia-curand-cu12==10.3.7.77
-    # via torch
-nvidia-cusolver-cu12==11.7.1.2
-    # via torch
-nvidia-cusparse-cu12==12.5.4.2
-    # via
-    #   nvidia-cusolver-cu12
-    #   torch
-nvidia-cusparselt-cu12==0.6.3
-    # via torch
-nvidia-nccl-cu12==2.26.2
-    # via torch
-nvidia-nvjitlink-cu12==12.6.85
-    # via
-    #   nvidia-cufft-cu12
-    #   nvidia-cusolver-cu12
-    #   nvidia-cusparse-cu12
-    #   torch
-nvidia-nvtx-cu12==12.6.77
-    # via torch
 orjson==3.10.18
     # via
     #   langgraph-sdk
@@ -243,13 +196,10 @@ packaging==24.2
     #   marshmallow
     #   matplotlib
     #   plotly
-    #   transformers
 pandas==2.2.3
     # via backend (pyproject.toml)
 pillow==11.2.1
-    # via
-    #   matplotlib
-    #   sentence-transformers
+    # via matplotlib
 plotly==6.0.1
     # via backend (pyproject.toml)
 propcache==0.3.1
@@ -280,14 +230,18 @@ pycryptodome==3.22.0
 pydantic==2.11.4
     # via
     #   backend (pyproject.toml)
+    #   cohere
     #   langchain
+    #   langchain-cohere
     #   langchain-core
     #   langchain-google-genai
     #   langgraph
     #   langsmith
     #   pydantic-settings
 pydantic-core==2.33.2
-    # via pydantic
+    # via
+    #   cohere
+    #   pydantic
 pydantic-settings==2.9.1
     # via langchain-community
 pyparsing==3.2.3
@@ -308,79 +262,48 @@ pyyaml==6.0.2
     #   langchain
     #   langchain-community
     #   langchain-core
-    #   transformers
-regex==2024.11.6
-    # via transformers
 requests==2.32.3
     # via
+    #   cohere
     #   google-api-core
     #   huggingface-hub
     #   langchain
     #   langchain-community
     #   langsmith
     #   requests-toolbelt
-    #   transformers
 requests-toolbelt==1.0.0
     # via langsmith
 rsa==4.9.1
     # via google-auth
-safetensors==0.5.3
-    # via transformers
-scikit-learn==1.6.1
-    # via sentence-transformers
-scipy==1.15.3
-    # via
-    #   scikit-learn
-    #   sentence-transformers
-sentence-transformers==4.1.0
-    # via langchain-huggingface
-setuptools==80.4.0
-    # via
-    #   torch
-    #   triton
 six==1.17.0
     # via python-dateutil
 sniffio==1.3.1
     # via anyio
-sqlalchemy==2.0.40
+sqlalchemy==2.0.41
     # via
     #   langchain
     #   langchain-community
-sympy==1.14.0
-    # via torch
 tenacity==9.1.2
     # via
     #   langchain-community
     #   langchain-core
-threadpoolctl==3.6.0
-    # via scikit-learn
 tokenizers==0.21.1
-    # via
-    #   langchain-huggingface
-    #   transformers
-torch==2.7.0
-    # via sentence-transformers
+    # via cohere
 tqdm==4.67.1
-    # via
-    #   huggingface-hub
-    #   sentence-transformers
-    #   transformers
-transformers==4.51.3
-    # via
-    #   langchain-huggingface
-    #   sentence-transformers
-triton==3.3.0
-    # via torch
+    # via huggingface-hub
+types-pyyaml==6.0.12.20250402
+    # via langchain-cohere
+types-requests==2.32.0.20250328
+    # via cohere
 typing-extensions==4.13.2
     # via
+    #   cohere
     #   huggingface-hub
     #   langchain-core
     #   minio
     #   pydantic
     #   pydantic-core
-    #   sentence-transformers
     #   sqlalchemy
-    #   torch
     #   typing-inspect
     #   typing-inspection
 typing-inspect==0.9.0
@@ -395,6 +318,7 @@ urllib3==2.4.0
     # via
     #   minio
     #   requests
+    #   types-requests
 werkzeug==3.1.3
     # via
     #   flask
