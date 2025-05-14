@@ -1,15 +1,12 @@
 import os
 import io
-import base64
 from QueryOutput import write_query
 from langgraph.graph import START, StateGraph
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
-from minio_config import minio_client, MINIO_BUCKET
+from configs.minio_config import minio_client, MINIO_BUCKET
 import pandas as pd
-from pandas_agent import pandas_agent
-import matplotlib.pyplot as plt
 from execute_analysis_query import execute_analysis_query
 from State import State
 from execute_sql_query import execute_sql_query
@@ -22,6 +19,10 @@ from langchain.output_parsers import PydanticOutputParser
 from pydantic import BaseModel, Field
 from typing import List
 from langchain.prompts import PromptTemplate
+from datetime import datetime
+import json
+import sqlite3
+from rag_query import rag_query
 
 
 app = Flask(__name__)
@@ -33,6 +34,72 @@ graph_builder = StateGraph(State).add_sequence(
 
 graph_builder.add_edge(START, "write_query")
 graph = graph_builder.compile()
+
+# Add SQLite database setup
+def init_db():
+    conn = sqlite3.connect('data/analysis.db')
+    c = conn.cursor()
+    
+    # Create threads table with additional columns
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS threads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            last_query TEXT NOT NULL,
+            last_updated TIMESTAMP NOT NULL,
+            file_name TEXT,
+            file_metadata TEXT
+        )
+    ''')
+    
+    # Create chat_messages table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            thread_id INTEGER NOT NULL,
+            role TEXT NOT NULL,
+            content TEXT NOT NULL,
+            timestamp TIMESTAMP NOT NULL,
+            FOREIGN KEY (thread_id) REFERENCES threads (id)
+        )
+    ''')
+    
+    # Create data_tables table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS data_tables (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            thread_id INTEGER NOT NULL,
+            title TEXT NOT NULL,
+            description TEXT,
+            headers TEXT NOT NULL,  -- JSON array of headers
+            data TEXT NOT NULL,     -- JSON array of rows
+            created_at TIMESTAMP NOT NULL,
+            FOREIGN KEY (thread_id) REFERENCES threads (id)
+        )
+    ''')
+    
+    # Create notes table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            thread_id INTEGER NOT NULL,
+            content TEXT NOT NULL,
+            created_at TIMESTAMP NOT NULL,
+            updated_at TIMESTAMP NOT NULL,
+            FOREIGN KEY (thread_id) REFERENCES threads (id)
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+# Initialize database
+# init_db()
+
+def get_db():
+    conn = sqlite3.connect('data/analysis.db')
+    conn.row_factory = sqlite3.Row  # This enables column access by name
+    return conn
 
 @app.route('/api/query', methods=['POST'])
 def handle_query():
@@ -279,7 +346,240 @@ def serve_file(filename):
         f.write(data.read())
     return send_file(temp_path, mimetype='image/png')
 
+@app.route('/api/threads', methods=['GET'])
+def get_threads():
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute('SELECT * FROM threads ORDER BY last_updated DESC')
+        threads = [dict(row) for row in c.fetchall()]
+        conn.close()
+        return jsonify(threads)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
+@app.route('/api/threads', methods=['POST'])
+def create_thread():
+    try:
+        data = request.get_json()
+        conn = get_db()
+        c = conn.cursor()
+        
+        # Create the thread
+        c.execute('''
+            INSERT INTO threads (title, last_query, last_updated, file_name, file_metadata)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (
+            data.get('title', ''),
+            data.get('lastQuery', ''),
+            datetime.now().isoformat(),
+            data.get('fileName'),
+            json.dumps(data.get('fileMetadata', {}))
+        ))
+        
+        thread_id = c.lastrowid
+        
+        # If file metadata contains content description, create a note
+        if data.get('fileMetadata', {}).get('content_description'):
+            now = datetime.now().isoformat()
+            c.execute('''
+                INSERT INTO notes (thread_id, content, created_at, updated_at)
+                VALUES (?, ?, ?, ?)
+            ''', (
+                thread_id,
+                data['fileMetadata']['content_description'],
+                now,
+                now
+            ))
+        
+        conn.commit()
+        
+        # Get the created thread
+        c.execute('SELECT * FROM threads WHERE id = ?', (thread_id,))
+        new_thread = dict(c.fetchone())
+        conn.close()
+        
+        return jsonify(new_thread)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/threads/<int:thread_id>/chat', methods=['GET'])
+def get_chat_history(thread_id):
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute('''
+            SELECT * FROM chat_messages 
+            WHERE thread_id = ? 
+            ORDER BY timestamp ASC
+        ''', (thread_id,))
+        messages = [dict(row) for row in c.fetchall()]
+        conn.close()
+        return jsonify(messages)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/threads/<int:thread_id>/chat', methods=['POST'])
+def add_chat_message(thread_id):
+    try:
+        data = request.get_json()
+        conn = get_db()
+        c = conn.cursor()
+        
+        c.execute('''
+            INSERT INTO chat_messages (thread_id, role, content, timestamp)
+            VALUES (?, ?, ?, ?)
+        ''', (
+            thread_id,
+            data.get('role', 'user'),
+            data.get('content', ''),
+            datetime.now().isoformat()
+        ))
+        
+        message_id = c.lastrowid
+        conn.commit()
+        
+        # Get the created message
+        c.execute('SELECT * FROM chat_messages WHERE id = ?', (message_id,))
+        message = dict(c.fetchone())
+        conn.close()
+        
+        return jsonify(message)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/threads/<int:thread_id>/data-tables', methods=['GET'])
+def get_thread_data_tables(thread_id):
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute('''
+            SELECT * FROM data_tables 
+            WHERE thread_id = ? 
+            ORDER BY created_at DESC
+        ''', (thread_id,))
+        tables = [dict(row) for row in c.fetchall()]
+        conn.close()
+        return jsonify(tables)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/threads/<int:thread_id>/data-tables', methods=['POST'])
+def add_data_table(thread_id):
+    try:
+        data = request.get_json()
+        conn = get_db()
+        c = conn.cursor()
+        
+        c.execute('''
+            INSERT INTO data_tables (thread_id, title, description, headers, data, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            thread_id,
+            data.get('title', ''),
+            data.get('description', ''),
+            json.dumps(data.get('headers', [])),
+            json.dumps(data.get('data', [])),
+            datetime.now().isoformat()
+        ))
+        
+        table_id = c.lastrowid
+        conn.commit()
+        
+        # Get the created table
+        c.execute('SELECT * FROM data_tables WHERE id = ?', (table_id,))
+        new_table = dict(c.fetchone())
+        conn.close()
+        
+        return jsonify(new_table)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/threads/<int:thread_id>/notes', methods=['GET'])
+def get_thread_notes(thread_id):
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute('''
+            SELECT * FROM notes 
+            WHERE thread_id = ? 
+            ORDER BY updated_at DESC
+        ''', (thread_id,))
+        notes = [dict(row) for row in c.fetchall()]
+        conn.close()
+        return jsonify(notes)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/threads/<int:thread_id>/notes', methods=['POST'])
+def add_note(thread_id):
+    try:
+        data = request.get_json()
+        conn = get_db()
+        c = conn.cursor()
+        
+        now = datetime.now().isoformat()
+        c.execute('''
+            INSERT INTO notes (thread_id, content, created_at, updated_at)
+            VALUES (?, ?, ?, ?)
+        ''', (
+            thread_id,
+            data.get('content', ''),
+            now,
+            now
+        ))
+        
+        note_id = c.lastrowid
+        conn.commit()
+        
+        # Get the created note
+        c.execute('SELECT * FROM notes WHERE id = ?', (note_id,))
+        new_note = dict(c.fetchone())
+        conn.close()
+        
+        return jsonify(new_note)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/threads/<int:thread_id>/notes/<int:note_id>', methods=['PUT'])
+def update_note(thread_id, note_id):
+    try:
+        data = request.get_json()
+        conn = get_db()
+        c = conn.cursor()
+        
+        c.execute('''
+            UPDATE notes 
+            SET content = ?, updated_at = ?
+            WHERE id = ? AND thread_id = ?
+        ''', (
+            data.get('content', ''),
+            datetime.now().isoformat(),
+            note_id,
+            thread_id
+        ))
+        
+        conn.commit()
+        
+        # Get the updated note
+        c.execute('SELECT * FROM notes WHERE id = ?', (note_id,))
+        updated_note = dict(c.fetchone())
+        conn.close()
+        
+        return jsonify(updated_note)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/rag-query', methods=['POST'])
+def handle_rag_query():
+    data = request.get_json()
+    if not data or 'question' not in data:
+        return jsonify({'error': 'Missing filename or question'}), 400
+    try:
+        answer = rag_query('sms_data.csv', data['question'])
+        return jsonify({'answer': answer})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 def main():
     app.run(host='0.0.0.0', port=5000, debug=True)

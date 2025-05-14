@@ -143,9 +143,9 @@
 		</div>
 	</div>
 
-	<div class="container">
+	<!-- <div class="container">
 		<FileUpload on:uploadComplete={handleUploadComplete} />
-	</div>
+	</div> -->
 </main>
 
 <style>

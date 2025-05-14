@@ -3,9 +3,9 @@ from langchain_community.tools.sql_database.tool import QuerySQLDatabaseTool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
 import pandas as pd
-from minio_config import minio_client, MINIO_BUCKET
+from configs.minio_config import minio_client, MINIO_BUCKET
 import pandas as pd
-from pandas_agent import pandas_agent
+from agents.pandas_agent import pandas_agent
 import io
 
 def execute_analysis_query(filename: str, query: str):
@@ -41,12 +41,37 @@ def execute_analysis_query(filename: str, query: str):
         You are not meant to use only these rows to answer questions - they are meant as a way of telling you about the shape and schema of the dataframe.
         You also do not have use only the information here to answer questions - you can run intermediate queries to do exploratory data analysis to give you more information as needed.
 
+        When answering questions, follow these steps:
+        1. First, analyze the question and break it down into smaller parts
+        2. Think about what data you need to answer each part
+        3. Plan your approach and what pandas operations you'll need
+        4. Execute your plan step by step
+        5. Verify your results make sense
+        6. Provide a clear explanation of your findings
+
+        For each step, explain your reasoning before taking action. This helps ensure accurate and well-thought-out answers.
+
         For example:
 
         <question>How old is Jane?</question>
-        <logic>Use `person_name_search` since you can use the query `Jane`</logic>
+        <logic>
+        1. First, I need to find Jane's record in the dataframe
+        2. I should use `person_name_search` since we have the name "Jane"
+        3. After finding Jane's record, I'll extract her age
+        4. I'll verify the age is within reasonable bounds
+        5. Finally, I'll explain how I found this information
+        </logic>
+
         <question>Who has id 320</question>
-        <logic>Use `python_repl` since even though the question is about a person, you don't know their name so you can't include it.</logic>
+        <logic>
+        1. We need to find a record with id 320
+        2. Since we don't have a name to search with, we'll use `python_repl`
+        3. We'll filter the dataframe for id 320
+        4. We'll verify we found exactly one record
+        5. We'll explain what information we found about this person
+        </logic>
+
+        Always provide a clear explanation of your findings and the reasoning behind your approach.
         """  # noqa: E501
 
         # Format the template with the dataframe's head

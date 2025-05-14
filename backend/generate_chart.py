@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import numpy as np
 from datetime import datetime
-from minio_config import minio_client, MINIO_BUCKET
-from pandas_agent import pandas_agent
+from configs.minio_config import minio_client, MINIO_BUCKET
+from agents.pandas_agent import pandas_agent
 from llm import llm
 from State import State
 from pydantic import BaseModel, Field

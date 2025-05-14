@@ -8,6 +8,7 @@ dependencies = [
     "langchain-community>=0.3.23",
     "langchain-core>=0.3.58",
     "langchain[google-genai]>=0.3.25",
+    "langchain-openai",
     "langgraph>=0.4.1",
     "flask>=3.0.0",
     "flask-cors>=4.0.0",
@@ -17,7 +18,8 @@ dependencies = [
     "pandas",
     "langchain_experimental",
     "pydantic",
-    "plotly"
+    "plotly",
+    "faiss-cpu"    
 ]
 
 [build-system]

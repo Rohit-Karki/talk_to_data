@@ -9,13 +9,49 @@
 
 	import FileUpload from './FileUpload.svelte';
 
-	// Mock threads
-	let threads = [
-		{ id: 1, title: 'RFM Bubble Chart', lastQuery: 'Show a bubble chart of customer segments', lastUpdated: '2h ago' },
-		{ id: 2, title: 'RFM Heatmap', lastQuery: 'Show a heatmap of RFM scores', lastUpdated: '1d ago' },
-	];
-	let selectedThread = threads[0];
+	// Add these interfaces at the top of the script section
+	interface Thread {
+		id: number;
+		title: string;
+		last_query: string;
+		last_updated: string;
+		file_name?: string;
+		file_metadata?: {
+			content_description?: string;
+			[key: string]: any;
+		};
+	}
 
+	interface ChatMessage {
+		role: 'user' | 'assistant';
+		content: string;
+		timestamp: string;
+	}
+
+	interface DataTable {
+		id: number;
+		thread_id: number;
+		title: string;
+		description?: string;
+		headers: string[];
+		data: any[];
+		created_at: string;
+	}
+
+	interface Note {
+		id: number;
+		thread_id: number;
+		content: string;
+		created_at: string;
+		updated_at: string;
+	}
+
+	// Update the variable declarations with proper types
+	let threads: Thread[] = [];
+	let selectedThread: Thread | null = null;
+	let chatHistory: ChatMessage[] = [];
+	let dataTables: DataTable[] = [];
+	let notes: Note[] = [];
 	let selectedFile: string | null = null;
 	let uploadedFiles: string[] = [];
 	let analysisQuery = '';
@@ -35,14 +71,156 @@
 		if (!uploadedFiles.includes(selectedFile)) {
 			uploadedFiles = [...uploadedFiles, selectedFile];
 		}
+		
+		// Get file metadata and create a new thread with the description
+		const metadata = await getFileMetadata(selectedFile);
+		if (metadata && metadata.content_description) {
+			const newThread = await createThread(
+				selectedFile,
+				'Initial file upload',
+				selectedFile,
+				metadata
+			);
+			if (newThread) {
+				selectedThread = newThread;
+				await loadThreadData(newThread.id);
+			}
+		}
 	}
 
 	function selectFile(file: string) {
 		selectedFile = file;
 	}
 
-	function selectThread(thread: any) {
+	async function loadThreads() {
+		try {
+			const response = await fetch('http://localhost:5000/api/threads');
+			if (!response.ok) {
+				throw new Error('Failed to load threads');
+			}
+			threads = await response.json();
+			if (threads.length > 0) {
+				selectedThread = threads[0];
+				await loadChatHistory(selectedThread.id);
+			}
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to load threads';
+		}
+	}
+
+	async function loadChatHistory(threadId: number) {
+		try {
+			const response = await fetch(`http://localhost:5000/api/threads/${threadId}/chat`);
+			if (!response.ok) {
+				throw new Error('Failed to load chat history');
+			}
+			chatHistory = await response.json();
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to load chat history';
+		}
+	}
+
+	async function getFileMetadata(filename: string) {
+		try {
+			const response = await fetch(`http://localhost:5000/api/file-metadata/${filename}`);
+			if (!response.ok) {
+				throw new Error('Failed to get file metadata');
+			}
+			return await response.json();
+		} catch (e) {
+			console.error('Error getting file metadata:', e);
+			return null;
+		}
+	}
+
+	async function createThread(title: string, query: string, fileName?: string, fileMetadata?: any) {
+		try {
+			const response = await fetch('http://localhost:5000/api/threads', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					title: title,
+					lastQuery: query,
+					fileName: fileName,
+					fileMetadata: fileMetadata
+				})
+			});
+			
+			if (!response.ok) {
+				throw new Error('Failed to create thread');
+			}
+			
+			const newThread = await response.json();
+			threads = [newThread, ...threads];
+			selectedThread = newThread;
+			return newThread;
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to create thread';
+			return null;
+		}
+	}
+
+	async function loadDataTables(threadId: number) {
+		try {
+			const response = await fetch(`http://localhost:5000/api/threads/${threadId}/data-tables`);
+			if (!response.ok) {
+				throw new Error('Failed to load data tables');
+			}
+			dataTables = await response.json();
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to load data tables';
+		}
+	}
+
+	async function loadNotes(threadId: number) {
+		try {
+			const response = await fetch(`http://localhost:5000/api/threads/${threadId}/notes`);
+			if (!response.ok) {
+				throw new Error('Failed to load notes');
+			}
+			notes = await response.json();
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to load notes';
+		}
+	}
+
+	async function loadThreadData(threadId: number) {
+		await loadChatHistory(threadId);
+		await loadDataTables(threadId);
+		await loadNotes(threadId);
+	}
+
+	async function addChatMessage(threadId: number, role: 'user' | 'assistant', content: string) {
+		try {
+			const response = await fetch(`http://localhost:5000/api/threads/${threadId}/chat`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					role: role,
+					content: content
+				})
+			});
+			
+			if (!response.ok) {
+				throw new Error('Failed to add chat message');
+			}
+			
+			const message = await response.json();
+			chatHistory = [...chatHistory, message];
+			return message;
+		} catch (e) {
+			error = e instanceof Error ? e.message : 'Failed to add chat message';
+			return null;
+		}
+	}
+
+	async function selectThread(thread: Thread) {
 		selectedThread = thread;
+		await loadChatHistory(thread.id);
 		// Reset state for demo
 		result = null;
 		chartData = null;
@@ -66,41 +244,54 @@
 		analysisResult = null;
 
 		try {
-			const response = await fetch('http://localhost:5000/api/analyze', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					filename: selectedFile,
-					query: analysisQuery
-				})
-			});
-
-			if (!response.ok) {
-				throw new Error('Failed to generate analysis');
+			// Create a new thread if none is selected
+			if (!selectedThread) {
+				const newThread = await createThread(
+					analysisQuery.slice(0, 30) + (analysisQuery.length > 30 ? '...' : ''),
+					analysisQuery
+				);
+				if (!newThread) {
+					throw new Error('Failed to create thread');
+				}
+				selectedThread = newThread;
 			}
-			
-			const data = await response.json();
-			analysisResult = data.data;
-			console.log('analysisResult', analysisResult);
-			
-			// Update thread with new analysis
-			const newThread = {
-				id: threads.length + 1,
-				title: analysisQuery.slice(0, 30) + (analysisQuery.length > 30 ? '...' : ''),
-				lastQuery: analysisQuery,
-				lastUpdated: 'Just now'
-			};
-			threads = [newThread, ...threads];
-			selectedThread = newThread;
-			
+
+			// Add user message to chat history
+			if (selectedThread) {
+				await addChatMessage(selectedThread.id, 'user', analysisQuery);
+
+				const response = await fetch('http://localhost:5000/api/analyze', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({
+						filename: selectedFile,
+						query: analysisQuery
+					})
+				});
+
+				if (!response.ok) {
+					throw new Error('Failed to generate analysis');
+				}
+				
+				const data = await response.json();
+				analysisResult = data.data;
+				
+				// Add assistant message to chat history
+				await addChatMessage(selectedThread.id, 'assistant', JSON.stringify(analysisResult));
+			}
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to generate analysis';
 		} finally {
 			loading = false;
 		}
 	}
+
+	// Add onMount to load threads when component is mounted
+	onMount(() => {
+		loadThreads();
+	});
 </script>
 
 <svelte:head>
@@ -111,10 +302,10 @@
 		<div class="sidebar-header">Analysis Threads</div>
 		<ul class="thread-list">
 			{#each threads as thread}
-				<button type="button" class="thread-item {thread.id === selectedThread.id ? 'active' : ''}" on:click={() => selectThread(thread)}>
+				<button type="button" class="thread-item {thread.id === selectedThread?.id ? 'active' : ''}" on:click={() => selectThread(thread)}>
 					<div class="thread-title">{thread.title}</div>
-					<div class="thread-meta">{thread.lastQuery}</div>
-					<div class="thread-time">{thread.lastUpdated}</div>
+					<div class="thread-meta">{thread.last_query}</div>
+					<div class="thread-time">{thread.last_updated}</div>
 				</button>
 			{/each}
 		</ul>
@@ -122,7 +313,7 @@
 
 	<div class="analysis-main">
 		<div class="analysis-header">
-			<h1>{selectedThread.title}</h1>
+			<h1>{selectedThread?.title || 'New Analysis'}</h1>
 		</div>
 
 		<div class="analysis-content">
@@ -131,85 +322,88 @@
 			{/if}
 
 			<div class="chat-container">
-				{#if analysisResult}
-					<div class="message user-message">
-						<div class="message-content">
-							<p>{analysisQuery}</p>
-						</div>
-					</div>
-					<div class="message assistant-message">
-						<div class="message-content">
-							{#if analysisResult.code_blocks && analysisResult.code_blocks.length > 0}
-								<div class="code-block-card">
-									<div class="code-block-header">
-										<span class="python-icon">🐍</span>
-										<span class="python-label">Python</span>
-										<div class="code-block-actions">
-											<button class="code-action-btn">Rerun code</button>
-											<button class="code-action-btn">Edit code</button>
-										</div>
-									</div>
-									<div class="code-block-content">
-										{#each analysisResult.code_blocks as codeBlock}
-											<Highlight langtag language={python} code={codeBlock.code} />
-										{/each}
-									</div>
-								</div>
-							{/if}
-
-							{#if analysisResult.explanations && analysisResult.explanations.length > 0}
-								{#each analysisResult.explanations as explanation}
-									<div class="code-explanation-card">
-										<div class="explanation-title">Code Explanation</div>
-										<div class="explanation-content">
-											<SvelteMarkdown source={explanation.text} />
-										</div>
-									</div>
-								{/each}
-							{/if}
-
-							{#if analysisResult.visualizations && analysisResult.visualizations.length > 0}
-								{#each analysisResult.visualizations as visualization}
-									<div class="chart-card">
-										<h3>{visualization.title}</h3>
-										<img src={visualization.data.url || `data:image/png;base64,${visualization.data.image}`} alt={visualization.title} />
-										{#if visualization.description}
-											<SvelteMarkdown source={visualization.description} />
-										{/if}
-									</div>
-								{/each}
-							{/if}
-
-							{#if analysisResult.data_tables && analysisResult.data_tables.length > 0}
-								{#each analysisResult.data_tables as table}
-									<div class="table-card">
-										<h3>{table.title || 'Data Table'}</h3>
-										{#if table.description}
-											<p class="table-description">{table.description}</p>
-										{/if}
-										<table>
-											<thead>
-												<tr>
-													{#each table.headers as header}
-														<th>{header}</th>
+				{#if chatHistory.length > 0}
+					{#each chatHistory as message}
+						<div class="message {message.role}-message">
+							<div class="message-content">
+								{#if message.role === 'assistant'}
+									{#if analysisResult}
+										{#if analysisResult.code_blocks && analysisResult.code_blocks.length > 0}
+											<div class="code-block-card">
+												<div class="code-block-header">
+													<span class="python-icon">🐍</span>
+													<span class="python-label">Python</span>
+													<div class="code-block-actions">
+														<button class="code-action-btn">Rerun code</button>
+														<button class="code-action-btn">Edit code</button>
+													</div>
+												</div>
+												<div class="code-block-content">
+													{#each analysisResult.code_blocks as codeBlock}
+														<Highlight langtag language={python} code={codeBlock.code} />
 													{/each}
-												</tr>
-											</thead>
-											<tbody>
-												{#each table.data as row}
-													<tr>
-														{#each table.headers as header}
-															<td>{row[header]}</td>
-														{/each}
-													</tr>
-												{/each}
-											</tbody>
-										</table>
-									</div>
-								{/each}
-							{/if}
+												</div>
+											</div>
+										{/if}
+
+										{#if analysisResult.explanations && analysisResult.explanations.length > 0}
+											{#each analysisResult.explanations as explanation}
+												<div class="code-explanation-card">
+													<div class="explanation-title">Code Explanation</div>
+													<div class="explanation-content">
+														<SvelteMarkdown source={explanation.text} />
+													</div>
+												</div>
+											{/each}
+										{/if}
+
+										{#if analysisResult.visualizations && analysisResult.visualizations.length > 0}
+											{#each analysisResult.visualizations as visualization}
+												<div class="chart-card">
+													<h3>{visualization.title}</h3>
+													<img src={visualization.data.url || `data:image/png;base64,${visualization.data.image}`} alt={visualization.title} />
+													{#if visualization.description}
+														<SvelteMarkdown source={visualization.description} />
+													{/if}
+												</div>
+											{/each}
+										{/if}
+
+										{#if analysisResult.data_tables && analysisResult.data_tables.length > 0}
+											{#each analysisResult.data_tables as table}
+												<div class="table-card">
+													<h3>{table.title || 'Data Table'}</h3>
+													{#if table.description}
+														<p class="table-description">{table.description}</p>
+													{/if}
+													<table>
+														<thead>
+															<tr>
+																{#each table.headers as header}
+																	<th>{header}</th>
+																{/each}
+															</tr>
+														</thead>
+														<tbody>
+															{#each table.data as row}
+																<tr>
+																	{#each table.headers as header}
+																		<td>{row[header]}</td>
+																	{/each}
+																</tr>
+															{/each}
+														</tbody>
+													</table>
+												</div>
+											{/each}
+										{/if}
+									{/if}
+								{:else}
+									<p>{message.content}</p>
+								{/if}
+							</div>
 						</div>
-					</div>
+					{/each}
 				{/if}
 			</div>
 		</div>
@@ -268,18 +462,32 @@
 					<h3>Analysis Outline</h3>
 					<ul class="outline-list">
 						{#each threads as thread}
-							<li class="outline-item {thread.id === selectedThread.id ? 'active' : ''}" on:click={() => selectThread(thread)}>
+							<li class="outline-item {thread.id === selectedThread?.id ? 'active' : ''}" on:click={() => selectThread(thread)}>
 								<span class="outline-title">{thread.title}</span>
-								<span class="outline-time">{thread.lastUpdated}</span>
+								<span class="outline-time">{thread.last_updated}</span>
 							</li>
 						{/each}
 					</ul>
 				</div>
 			{:else if activeTab === 'notes'}
 				<div class="tab-pane">
-					<h3>Analysis Notes</h3>
+					<h3>Data Description</h3>
 					<div class="notes-content">
-						<p>Add your analysis notes here...</p>
+						{#if notes.length > 0}
+							<div class="note-card">
+								<div class="note-header">
+									<span class="note-date">Created: {new Date(notes[0].created_at).toLocaleString()}</span>
+									{#if notes[0].updated_at !== notes[0].created_at}
+										<span class="note-date">Updated: {new Date(notes[0].updated_at).toLocaleString()}</span>
+									{/if}
+								</div>
+								<div class="note-body">
+									<SvelteMarkdown source={notes[0].content} />
+								</div>
+							</div>
+						{:else}
+							<p>No data description available for this thread.</p>
+						{/if}
 					</div>
 				</div>
 			{:else if activeTab === 'data-explorer'}
@@ -783,5 +991,34 @@
 
 	.assistant-message .table-card table {
 		margin-top: 0.5rem;
+	}
+
+	.note-card {
+		background: #fff;
+		border-radius: 8px;
+		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+		padding: 1.5rem;
+		margin-bottom: 1rem;
+	}
+
+	.note-header {
+		display: flex;
+		justify-content: space-between;
+		margin-bottom: 1rem;
+		color: #666;
+		font-size: 0.9rem;
+	}
+
+	.note-body {
+		color: #333;
+		line-height: 1.6;
+	}
+
+	.note-body :global(p) {
+		margin: 0 0 1rem 0;
+	}
+
+	.note-body :global(p:last-child) {
+		margin-bottom: 0;
 	}
 </style>
