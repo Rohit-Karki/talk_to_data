@@ -95,7 +95,7 @@ def init_db():
     conn.close()
 
 # Initialize database
-# init_db()
+init_db()
 
 def get_db():
     conn = sqlite3.connect('data/analysis.db')
@@ -274,11 +274,26 @@ def get_file_metadata(filename):
 def analyze_charts():
     data = request.get_json()
 
+    if not data or 'thread_id':
+        thread_metadata = {
+            'title': data.get('title', ''),
+            'last_query': data.get('query', ''),
+            'file_name': data.get('filename'),
+            'file_metadata': data.get('file_metadata', {})
+        }
+        thread = create_thread(thread_metadata)
+
+    add_chat_message(
+        thread_id=thread['id'],
+        role='user',
+        content=f"{data['query']}")
+    
     if not data or 'filename' not in data or 'query' not in data:
         return jsonify({'error': 'Missing filename or query'}), 400
     
     try:
-        result = generate_chart(data['filename'], data['query'])
+        result, markdown = generate_chart(data['filename'], data['query']).values()
+        
         # Convert AnalysisResult to dict for JSON serialization
         result_dict = {
             'code_blocks': [block.model_dump() for block in result.code_blocks],
@@ -289,9 +304,12 @@ def analyze_charts():
             'timestamp': result.timestamp.isoformat()
         }
         
+        add_chat_message(thread_id=thread['id'], role='assistant', content=markdown)
+
         return jsonify({
             'message': 'Analysis completed successfully',
-            'data': result_dict
+            "thread_id": thread['id'],
+            'data': result_dict,            
         })
     except Exception as e:
         print(f"Error in analysis: {str(e)}")
@@ -362,9 +380,8 @@ def get_threads():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/threads', methods=['POST'])
-def create_thread():
-    try:
-        data = request.get_json()
+def create_thread(data):
+    try:        
         conn = get_db()
         c = conn.cursor()
         
@@ -374,10 +391,10 @@ def create_thread():
             VALUES (?, ?, ?, ?, ?)
         ''', (
             data.get('title', ''),
-            data.get('lastQuery', ''),
+            data.get('last_query', ''),
             datetime.now().isoformat(),
-            data.get('fileName'),
-            json.dumps(data.get('fileMetadata', {}))
+            data.get('file_name'),
+            json.dumps(data.get('file_metadata', {}))
         ))
         
         thread_id = c.lastrowid
@@ -402,7 +419,7 @@ def create_thread():
         new_thread = dict(c.fetchone())
         conn.close()
         
-        return jsonify(new_thread)
+        return new_thread
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

@@ -184,9 +184,9 @@ def generate_chart(filename: str, query: str) -> AnalysisResult:
         
         # Parse the response into structured format
         analysis_result = parse_llm_response(response['output'])
-        print(f"analysis_result: {analysis_result}")
+        # print(f"analysis_result: {analysis_result}")
         
-        print(f"code blocks are {analysis_result.code_blocks}")
+        # print(f"code blocks are {analysis_result.code_blocks}")
         # Execute code blocks and update visualizations
         for code_block in analysis_result.code_blocks:
             if code_block.type == 'visualization':
@@ -236,7 +236,10 @@ def generate_chart(filename: str, query: str) -> AnalysisResult:
         }
         
         print(f"Final analysis_result.visualizations: {analysis_result.visualizations}")
-        return analysis_result
+        return {
+            "result": analysis_result,
+            "markdown_response": response['output']
+            }
         
     except Exception as e:
         raise Exception(f"Error generating analysis: {str(e)}")

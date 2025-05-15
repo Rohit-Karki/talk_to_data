@@ -1,4 +1,5 @@
 <script lang="ts">	
+	import { onMount } from 'svelte';
 	import SvelteMarkdown from 'svelte-markdown'
 
 	import Highlight from "svelte-highlight";	
@@ -192,24 +193,14 @@
 		await loadNotes(threadId);
 	}
 
-	async function addChatMessage(threadId: number, role: 'user' | 'assistant', content: string) {
-		try {
-			const response = await fetch(`http://localhost:5000/api/threads/${threadId}/chat`, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					role: role,
-					content: content
-				})
-			});
-			
-			if (!response.ok) {
-				throw new Error('Failed to add chat message');
-			}
-			
-			const message = await response.json();
+	function addChatMessage(threadId: number, role: 'user' | 'assistant', content: string) {
+		try {			
+			const message: ChatMessage = {
+				role,
+				content,
+				timestamp: new Date().toISOString()
+			};
+			// Update the chat history with the new message
 			chatHistory = [...chatHistory, message];
 			return message;
 		} catch (e) {
