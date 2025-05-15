@@ -273,7 +273,7 @@ def get_file_metadata(filename):
 @app.route('/api/analyze', methods=['POST'])
 def analyze_charts():
     data = request.get_json()
-
+    thread = None
     if not data or 'thread_id':
         thread_metadata = {
             'title': data.get('title', ''),
@@ -282,6 +282,13 @@ def analyze_charts():
             'file_metadata': data.get('file_metadata', {})
         }
         thread = create_thread(thread_metadata)
+        print(thread)
+    else:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute('SELECT * FROM threads WHERE id = ?', (data['thread_id'],))
+        thread = dict(c.fetchone())
+        conn.close()
 
     add_chat_message(
         thread_id=thread['id'],
@@ -292,7 +299,7 @@ def analyze_charts():
         return jsonify({'error': 'Missing filename or query'}), 400
     
     try:
-        result, markdown = generate_chart(data['filename'], data['query']).values()
+        result, markdown_response = generate_chart(data['filename'], data['query']).values()
         
         # Convert AnalysisResult to dict for JSON serialization
         result_dict = {
@@ -304,11 +311,13 @@ def analyze_charts():
             'timestamp': result.timestamp.isoformat()
         }
         
-        add_chat_message(thread_id=thread['id'], role='assistant', content=markdown)
+        result_content = json.dumps(result_dict)
+        
+        add_chat_message(thread_id=thread['id'], role='assistant', content=result_content)
 
         return jsonify({
             'message': 'Analysis completed successfully',
-            "thread_id": thread['id'],
+            "thread": thread,
             'data': result_dict,            
         })
     except Exception as e:
@@ -439,8 +448,9 @@ def get_chat_history(thread_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/threads/<int:thread_id>/chat', methods=['POST'])
-def add_chat_message(thread_id):
+# @app.route('/api/threads/<int:thread_id>/chat', methods=['POST'])
+def add_chat_message(thread_id, role, content):
+    """Add a chat message to the thread."""
     try:
         data = request.get_json()
         conn = get_db()
@@ -451,8 +461,8 @@ def add_chat_message(thread_id):
             VALUES (?, ?, ?, ?)
         ''', (
             thread_id,
-            data.get('role', 'user'),
-            data.get('content', ''),
+            role,
+            content,
             datetime.now().isoformat()
         ))
         

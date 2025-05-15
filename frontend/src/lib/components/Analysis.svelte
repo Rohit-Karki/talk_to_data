@@ -1,9 +1,9 @@
-<script lang="ts">	
+<script lang="ts">
 	import { onMount } from 'svelte';
-	import SvelteMarkdown from 'svelte-markdown'
+	import SvelteMarkdown from 'svelte-markdown';
 
-	import Highlight from "svelte-highlight";	
-	import _3024 from "svelte-highlight/styles/3024";
+	import Highlight from 'svelte-highlight';
+	import _3024 from 'svelte-highlight/styles/3024';
 
 	// direct import (recommended)
 	import python from 'svelte-highlight/languages/python';
@@ -72,21 +72,6 @@
 		if (!uploadedFiles.includes(selectedFile)) {
 			uploadedFiles = [...uploadedFiles, selectedFile];
 		}
-		
-		// Get file metadata and create a new thread with the description
-		const metadata = await getFileMetadata(selectedFile);
-		if (metadata && metadata.content_description) {
-			const newThread = await createThread(
-				selectedFile,
-				'Initial file upload',
-				selectedFile,
-				metadata
-			);
-			if (newThread) {
-				selectedThread = newThread;
-				await loadThreadData(newThread.id);
-			}
-		}
 	}
 
 	function selectFile(file: string) {
@@ -104,6 +89,8 @@
 				selectedThread = threads[0];
 				await loadChatHistory(selectedThread.id);
 			}
+			console.log('Loaded threads:', threads);
+			console.log('Chat history:', chatHistory);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load threads';
 		}
@@ -115,13 +102,14 @@
 			if (!response.ok) {
 				throw new Error('Failed to load chat history');
 			}
+
 			chatHistory = await response.json();
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load chat history';
 		}
 	}
 
-	async function getFileMetadata(filename: string) {
+	async function getFileMetadata(filename?: string) {
 		try {
 			const response = await fetch(`http://localhost:5000/api/file-metadata/${filename}`);
 			if (!response.ok) {
@@ -130,35 +118,6 @@
 			return await response.json();
 		} catch (e) {
 			console.error('Error getting file metadata:', e);
-			return null;
-		}
-	}
-
-	async function createThread(title: string, query: string, fileName?: string, fileMetadata?: any) {
-		try {
-			const response = await fetch('http://localhost:5000/api/threads', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					title: title,
-					lastQuery: query,
-					fileName: fileName,
-					fileMetadata: fileMetadata
-				})
-			});
-			
-			if (!response.ok) {
-				throw new Error('Failed to create thread');
-			}
-			
-			const newThread = await response.json();
-			threads = [newThread, ...threads];
-			selectedThread = newThread;
-			return newThread;
-		} catch (e) {
-			error = e instanceof Error ? e.message : 'Failed to create thread';
 			return null;
 		}
 	}
@@ -194,7 +153,7 @@
 	}
 
 	function addChatMessage(threadId: number, role: 'user' | 'assistant', content: string) {
-		try {			
+		try {
 			const message: ChatMessage = {
 				role,
 				content,
@@ -223,7 +182,12 @@
 		analysisQuery = '';
 	}
 
-	async function handleAnalysisSubmit() {
+	async function handleAnalysisSubmit(
+		title: string,
+		query: string,
+		fileName?: string,
+		fileMetadata?: any
+	) {
 		if (!selectedFile || !analysisQuery) {
 			error = 'Please select a file and enter your analysis query';
 			return;
@@ -237,19 +201,39 @@
 		try {
 			// Create a new thread if none is selected
 			if (!selectedThread) {
-				const newThread = await createThread(
-					analysisQuery.slice(0, 30) + (analysisQuery.length > 30 ? '...' : ''),
-					analysisQuery
-				);
+				const response = await fetch('http://localhost:5000/api/analyze', {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json'
+					},
+					body: JSON.stringify({
+						title: title,
+						lastQuery: query,
+						fileName: fileName,
+						fileMetadata: fileMetadata,
+						filename: selectedFile,
+						query: analysisQuery
+					})
+				});
+
+				const data = await response.json();
+				if (!response.ok) {
+					throw new Error('Failed to generate analysis');
+				}
+				const newThread = data.thread;
+				console.log('New thread created:', newThread);
 				if (!newThread) {
 					throw new Error('Failed to create thread');
 				}
 				selectedThread = newThread;
+				addChatMessage(selectedThread.id, 'user', analysisQuery);
+				console.log(JSON.parse(analysisResult));
+				await addChatMessage(selectedThread.id, 'assistant', JSON.stringify(analysisResult));
 			}
 
 			// Add user message to chat history
 			if (selectedThread) {
-				await addChatMessage(selectedThread.id, 'user', analysisQuery);
+				addChatMessage(selectedThread.id, 'user', analysisQuery);
 
 				const response = await fetch('http://localhost:5000/api/analyze', {
 					method: 'POST',
@@ -265,10 +249,10 @@
 				if (!response.ok) {
 					throw new Error('Failed to generate analysis');
 				}
-				
+
 				const data = await response.json();
 				analysisResult = data.data;
-				
+
 				// Add assistant message to chat history
 				await addChatMessage(selectedThread.id, 'assistant', JSON.stringify(analysisResult));
 			}
@@ -286,14 +270,18 @@
 </script>
 
 <svelte:head>
-  {@html _3024}
+	{@html _3024}
 </svelte:head>
 <div class="analysis-layout">
 	<aside class="analysis-sidebar-left">
 		<div class="sidebar-header">Analysis Threads</div>
 		<ul class="thread-list">
 			{#each threads as thread}
-				<button type="button" class="thread-item {thread.id === selectedThread?.id ? 'active' : ''}" on:click={() => selectThread(thread)}>
+				<button
+					type="button"
+					class="thread-item {thread.id === selectedThread?.id ? 'active' : ''}"
+					on:click={() => selectThread(thread)}
+				>
 					<div class="thread-title">{thread.title}</div>
 					<div class="thread-meta">{thread.last_query}</div>
 					<div class="thread-time">{thread.last_updated}</div>
@@ -318,8 +306,10 @@
 						<div class="message {message.role}-message">
 							<div class="message-content">
 								{#if message.role === 'assistant'}
-									{#if analysisResult}
-										{#if analysisResult.code_blocks && analysisResult.code_blocks.length > 0}
+									{#if message.content}
+										{@const analysisData = JSON.parse(message.content)}
+
+										{#if analysisData.code_blocks && analysisData.code_blocks.length > 0}
 											<div class="code-block-card">
 												<div class="code-block-header">
 													<span class="python-icon">🐍</span>
@@ -330,15 +320,15 @@
 													</div>
 												</div>
 												<div class="code-block-content">
-													{#each analysisResult.code_blocks as codeBlock}
+													{#each analysisData.code_blocks as codeBlock}
 														<Highlight langtag language={python} code={codeBlock.code} />
 													{/each}
 												</div>
 											</div>
 										{/if}
 
-										{#if analysisResult.explanations && analysisResult.explanations.length > 0}
-											{#each analysisResult.explanations as explanation}
+										{#if analysisData.explanations && analysisData.explanations.length > 0}
+											{#each analysisData.explanations as explanation}
 												<div class="code-explanation-card">
 													<div class="explanation-title">Code Explanation</div>
 													<div class="explanation-content">
@@ -348,11 +338,15 @@
 											{/each}
 										{/if}
 
-										{#if analysisResult.visualizations && analysisResult.visualizations.length > 0}
-											{#each analysisResult.visualizations as visualization}
+										{#if analysisData.visualizations && analysisData.visualizations.length > 0}
+											{#each analysisData.visualizations as visualization}
 												<div class="chart-card">
 													<h3>{visualization.title}</h3>
-													<img src={visualization.data.url || `data:image/png;base64,${visualization.data.image}`} alt={visualization.title} />
+													<img
+														src={visualization.data.url ||
+															`data:image/png;base64,${visualization.data.image}`}
+														alt={visualization.title}
+													/>
 													{#if visualization.description}
 														<SvelteMarkdown source={visualization.description} />
 													{/if}
@@ -360,8 +354,8 @@
 											{/each}
 										{/if}
 
-										{#if analysisResult.data_tables && analysisResult.data_tables.length > 0}
-											{#each analysisResult.data_tables as table}
+										{#if analysisData.data_tables && analysisData.data_tables.length > 0}
+											{#each analysisData.data_tables as table}
 												<div class="table-card">
 													<h3>{table.title || 'Data Table'}</h3>
 													{#if table.description}
@@ -398,13 +392,16 @@
 				{/if}
 			</div>
 		</div>
-		
 
 		<!-- Fixed bottom input bar -->
 		<div class="analysis-bottom-bar">
 			<div class="file-chips">
 				{#each uploadedFiles as file}
-					<button type="button" class="file-chip {file === selectedFile ? 'active' : ''}" on:click={() => selectFile(file)}>
+					<button
+						type="button"
+						class="file-chip {file === selectedFile ? 'active' : ''}"
+						on:click={() => selectFile(file)}
+					>
 						{file}
 					</button>
 				{/each}
@@ -417,7 +414,9 @@
 				class="bottom-query"
 			></textarea>
 			<button
-				on:click={handleAnalysisSubmit}
+				on:click={() => {
+					handleAnalysisSubmit();
+				}}
 				disabled={!selectedFile || !analysisQuery || loading}
 				class="submit-btn"
 			>
@@ -428,21 +427,21 @@
 
 	<aside class="analysis-sidebar-right">
 		<div class="tabs">
-			<button 
-				class="tab-button {activeTab === 'outline' ? 'active' : ''}" 
-				on:click={() => activeTab = 'outline'}
+			<button
+				class="tab-button {activeTab === 'outline' ? 'active' : ''}"
+				on:click={() => (activeTab = 'outline')}
 			>
 				Outline
 			</button>
-			<button 
-				class="tab-button {activeTab === 'notes' ? 'active' : ''}" 
-				on:click={() => activeTab = 'notes'}
+			<button
+				class="tab-button {activeTab === 'notes' ? 'active' : ''}"
+				on:click={() => (activeTab = 'notes')}
 			>
 				Notes
 			</button>
-			<button 
-				class="tab-button {activeTab === 'data-explorer' ? 'active' : ''}" 
-				on:click={() => activeTab = 'data-explorer'}
+			<button
+				class="tab-button {activeTab === 'data-explorer' ? 'active' : ''}"
+				on:click={() => (activeTab = 'data-explorer')}
 			>
 				Data Explorer
 			</button>
@@ -453,7 +452,10 @@
 					<h3>Analysis Outline</h3>
 					<ul class="outline-list">
 						{#each threads as thread}
-							<li class="outline-item {thread.id === selectedThread?.id ? 'active' : ''}" on:click={() => selectThread(thread)}>
+							<li
+								class="outline-item {thread.id === selectedThread?.id ? 'active' : ''}"
+								on:click={() => selectThread(thread)}
+							>
 								<span class="outline-title">{thread.title}</span>
 								<span class="outline-time">{thread.last_updated}</span>
 							</li>
@@ -467,9 +469,13 @@
 						{#if notes.length > 0}
 							<div class="note-card">
 								<div class="note-header">
-									<span class="note-date">Created: {new Date(notes[0].created_at).toLocaleString()}</span>
+									<span class="note-date"
+										>Created: {new Date(notes[0].created_at).toLocaleString()}</span
+									>
 									{#if notes[0].updated_at !== notes[0].created_at}
-										<span class="note-date">Updated: {new Date(notes[0].updated_at).toLocaleString()}</span>
+										<span class="note-date"
+											>Updated: {new Date(notes[0].updated_at).toLocaleString()}</span
+										>
 									{/if}
 								</div>
 								<div class="note-body">
@@ -551,7 +557,8 @@
 		transition: background 0.2s;
 		border-bottom: 1px solid #f0f0f0;
 	}
-	.thread-item.active, .thread-item:hover {
+	.thread-item.active,
+	.thread-item:hover {
 		background: #f0f4ff;
 	}
 	.thread-title {
@@ -605,7 +612,7 @@
 	.code-block-card {
 		background: #181c23;
 		border-radius: 12px;
-		box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 		padding: 0;
 		margin-bottom: 1.5rem;
 		overflow: hidden;
@@ -754,7 +761,7 @@
 			flex-direction: column;
 		}
 		.analysis-sidebar-left {
-			width: 100%;	
+			width: 100%;
 			border-right: none;
 			border-bottom: 1px solid #e0e0e0;
 		}
@@ -769,7 +776,8 @@
 		}
 	}
 	@media (max-width: 600px) {
-		.analysis-header, .analysis-content {
+		.analysis-header,
+		.analysis-content {
 			padding-left: 1rem;
 			padding-right: 1rem;
 		}
@@ -781,7 +789,7 @@
 	.table-card {
 		background: #22272e;
 		border-radius: 10px;
-		box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 		padding: 1.5rem;
 		margin-top: 1rem;
 		overflow-x: auto;
@@ -794,7 +802,8 @@
 		border-radius: 10px;
 		overflow: hidden;
 	}
-	.table-card th, .table-card td {
+	.table-card th,
+	.table-card td {
 		padding: 0.85rem 1.2rem;
 		text-align: left;
 	}
@@ -818,7 +827,8 @@
 	.table-card tr:last-child td {
 		border-bottom: none;
 	}
-	.chart-description, .table-description {
+	.chart-description,
+	.table-description {
 		margin-top: 1rem;
 		color: #666;
 		font-size: 0.95rem;
@@ -900,7 +910,8 @@
 		color: #666;
 	}
 
-	.notes-content, .data-explorer-content {
+	.notes-content,
+	.data-explorer-content {
 		color: #666;
 		font-size: 0.95rem;
 		line-height: 1.5;
