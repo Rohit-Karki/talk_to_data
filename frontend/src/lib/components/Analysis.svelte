@@ -209,9 +209,8 @@
 					body: JSON.stringify({
 						title: title,
 						lastQuery: query,
-						fileName: fileName,
-						fileMetadata: fileMetadata,
-						filename: selectedFile,
+						fileName: selectedFile,
+						fileMetadata: fileMetadata,						
 						query: analysisQuery
 					})
 				});
@@ -415,7 +414,7 @@
 			></textarea>
 			<button
 				on:click={() => {
-					handleAnalysisSubmit();
+					handleAnalysisSubmit(selectedFile);
 				}}
 				disabled={!selectedFile || !analysisQuery || loading}
 				class="submit-btn"

@@ -186,7 +186,7 @@ def generate_chart(filename: str, query: str) -> AnalysisResult:
         analysis_result = parse_llm_response(response['output'])
         # print(f"analysis_result: {analysis_result}")
         
-        # print(f"code blocks are {analysis_result.code_blocks}")
+        print(f"code blocks are {analysis_result.code_blocks}")
         # Execute code blocks and update visualizations
         for code_block in analysis_result.code_blocks:
             if code_block.type == 'visualization':
