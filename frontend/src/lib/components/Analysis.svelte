@@ -87,10 +87,11 @@
 			threads = await response.json();
 			if (threads.length > 0) {
 				selectedThread = threads[0];
-				await loadChatHistory(selectedThread.id);
+				await loadThreadData(selectedThread.id);
 			}
 			console.log('Loaded threads:', threads);
 			console.log('Chat history:', chatHistory);
+			console.log('Data tables:', dataTables);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load threads';
 		}
@@ -129,6 +130,7 @@
 				throw new Error('Failed to load data tables');
 			}
 			dataTables = await response.json();
+			console.log('Response:', dataTables);
 		} catch (e) {
 			error = e instanceof Error ? e.message : 'Failed to load data tables';
 		}
@@ -170,7 +172,7 @@
 
 	async function selectThread(thread: Thread) {
 		selectedThread = thread;
-		await loadChatHistory(thread.id);
+		await loadThreadData(thread.id);
 		// Reset state for demo
 		result = null;
 		chartData = null;
@@ -210,7 +212,7 @@
 						title: title,
 						lastQuery: query,
 						fileName: selectedFile,
-						fileMetadata: fileMetadata,						
+						fileMetadata: fileMetadata,
 						query: analysisQuery
 					})
 				});
@@ -491,6 +493,32 @@
 					<h3>Data Explorer</h3>
 					<div class="data-explorer-content">
 						<p>Explore your data here...</p>
+						{#each dataTables as table}
+							<div class="table-card">
+								<h3>{table.title || 'Data Table'}</h3>
+								{#if table.description}
+									<p class="table-description">{table.description}</p>
+								{/if}
+								<table>
+									<thead>
+										<tr>
+											{#each table.headers as header}
+												<th>{header}</th>
+											{/each}
+										</tr>
+									</thead>
+									<tbody>
+										{#each table.data as row}
+											<tr>
+												{#each table.headers as header}
+													<td>{row[header]}</td>
+												{/each}
+											</tr>
+										{/each}
+									</tbody>
+								</table>
+							</div>
+						{/each}
 					</div>
 				</div>
 			{/if}
