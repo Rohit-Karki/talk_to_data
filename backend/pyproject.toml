@@ -23,7 +23,9 @@ dependencies = [
     "cohere",
     "ollama",
     "langchain-cohere",
-    "langchain-ollama"
+    "langchain-ollama",
+    "tqdm",
+    "pymongo"
 ]
 
 [build-system]

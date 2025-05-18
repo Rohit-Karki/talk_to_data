@@ -21,6 +21,8 @@ def pandas_agent(df):
         tool=PythonAstREPLTool(),
         # python_agent=python_agent,
         agent_executor_kwargs={"handle_parsing_errors": True},
-        allow_dangerous_code=True
+        allow_dangerous_code=True,
+        max_iterations=15,
+        # max_execution_time=60,
     )
     return agent

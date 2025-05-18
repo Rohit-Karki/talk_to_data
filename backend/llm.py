@@ -9,7 +9,7 @@ if not GOOGLE_API_KEY:
 # llm = init_chat_model("gemini-2.0-flash", model_provider="google_genai")
 
 llm = ChatOllama(
-    model="qwen2.5-coder:3b",
+    model="llama2:latest",
     temperature=0,
     # other params...
 )
