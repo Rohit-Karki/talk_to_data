@@ -1,30 +1,17 @@
 import io
 import base64
-import re
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import numpy as np
-from datetime import datetime
 from configs.minio_config import minio_client, MINIO_BUCKET
 from agents.pandas_agent import pandas_agent
 from llm import llm
-from State import State
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List, Dict, Optional, Union
-import plotly.graph_objects as go
-import os
-from chart_generation.models import AnalysisResult, CodeBlock, Explanation, Visualization
-from chart_generation.markdown_parser import (
-    extract_code_from_markdown,
-    extract_code_explanation,
-    extract_chart_explanation,
-    extract_data_table
-)
+from chart_generation.models import AnalysisResult, Visualization
 from chart_generation.chart_utils import (
-    determine_chart_type,
-    setup_plot_style,
-    determine_code_type
+    determine_chart_type
 )
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import PromptTemplate
@@ -181,7 +168,7 @@ def generate_chart(filename: str, query: str) -> AnalysisResult:
         
         # Get the response from the agent
         response = agent.invoke({"input": prompt.format(query=query)})
-        
+        print(f"Response from agent: {response}")
         # Parse the response into structured format
         analysis_result = parse_llm_response(response['output'])
         # print(f"analysis_result: {analysis_result}")
@@ -227,13 +214,7 @@ def generate_chart(filename: str, query: str) -> AnalysisResult:
                     print(f"Error executing visualization code: {str(e)}")
                 finally:
                     # Close any open figures
-                    plt.close('all')
-        
-        # Update metadata
-        analysis_result.metadata = {
-            'columns': df.columns.tolist(),
-            'shape': df.shape
-        }
+                    plt.close('all')            
         
         print(f"Final analysis_result.visualizations: {analysis_result.visualizations}")
         return {
@@ -244,21 +225,5 @@ def generate_chart(filename: str, query: str) -> AnalysisResult:
     except Exception as e:
         raise Exception(f"Error generating analysis: {str(e)}")
 
-def determine_code_type(code: str) -> str:
-    """
-    Determine the type of code block based on its content.
-    """
-    code = code.lower()
-    
-    if 'plot' in code or 'chart' in code or 'figure' in code:
-        return 'visualization'
-    elif 'describe' in code or 'info' in code or 'value_counts' in code:
-        return 'eda'
-    elif 'corr' in code or 'correlation' in code:
-        return 'correlation'
-    elif 'groupby' in code or 'aggregate' in code:
-        return 'aggregation'
-    elif 'fillna' in code or 'dropna' in code:
-        return 'data_cleaning'
-    else:
-        return 'general'
+if __name__ == "__main__":    
+    print(generate_chart("Titanic-Dataset.csv", "Perform EDA by plotting different plots and charts"))

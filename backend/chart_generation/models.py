@@ -28,7 +28,7 @@ class Visualization(BaseModel):
 class AnalysisResult(BaseModel):
     code_blocks: List[CodeBlock]
     explanations: List[Explanation]
-    data_tables: List[DataTable]
+    # data_tables: List[DataTable]
     visualizations: List[Visualization]
     metadata: Dict[str, Union[List[str], tuple]]
     timestamp: datetime = Field(default_factory=datetime.now) 

@@ -1,11 +1,15 @@
 import os
 import io
 import pandas as pd
+from langchain_community import embeddings
 from langchain_core.vectorstores import InMemoryVectorStore
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_core.documents import Document
 from configs.minio_config import minio_client, MINIO_BUCKET
 from langchain_cohere import CohereEmbeddings
+from langchain_ollama import OllamaEmbeddings
+from langchain.storage import LocalFileStore
+from langchain.embeddings import CacheBackedEmbeddings
 
 from llm import llm
 
@@ -42,6 +46,16 @@ class SMSRetriever:
         return pd.read_csv(self.filename)
     
     def _initialize_vectorstore(self):
+
+        store = LocalFileStore("./cache/")
+
+        # Initialize embeddings model
+        # embeddings = CohereEmbeddings(model="embed-english-v3.0")        
+        embeddings_ = OllamaEmbeddings(model="nomic-embed-text", base_url='http://0.0.0.0:11434',
+)
+        cached_embedder = CacheBackedEmbeddings.from_bytes_store(
+            embeddings_, store, namespace=embeddings_.model
+        )
         """Initialize the vector store with embeddings of all SMS messages."""
         df = self._load_sms_csv()
         
@@ -49,11 +63,9 @@ class SMSRetriever:
         docs = [Document(page_content=row['SMS_text'], metadata={"row": i}) 
                 for i, row in df.iterrows()]
         
-        # Initialize embeddings model
-        embeddings = CohereEmbeddings(model="embed-english-v3.0")
         
         # Create vector store
-        self.vectorstore = InMemoryVectorStore(embeddings)
+        self.vectorstore = InMemoryVectorStore(cached_embedder)
         _ = self.vectorstore.add_documents(documents=docs)
         print(f"Vector store initialized with {len(docs)} SMS messages")
     

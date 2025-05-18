@@ -299,7 +299,7 @@ def analyze_charts():
         return jsonify({'error': 'Missing filename or query'}), 400
     
     try:
-        result, markdown_response = generate_chart(data['filename'], data['query']).values()
+        result = generate_chart(data['filename'], data['query']).values()
         
         # Convert AnalysisResult to dict for JSON serialization
         result_dict = {
@@ -314,6 +314,8 @@ def analyze_charts():
         result_content = json.dumps(result_dict)
         
         add_chat_message(thread_id=thread['id'], role='assistant', content=result_content)
+        
+        _ = [add_data_table(thread_id=thread['id'], data=data_table) for data_table in result_dict['data_tables']]
 
         return jsonify({
             'message': 'Analysis completed successfully',
@@ -484,7 +486,7 @@ def get_thread_data_tables(thread_id):
         conn = get_db()
         c = conn.cursor()
         c.execute('''
-            SELECT * FROM data_tables 
+            SELECT * FROM data_tables
             WHERE thread_id = ? 
             ORDER BY created_at DESC
         ''', (thread_id,))
@@ -496,7 +498,7 @@ def get_thread_data_tables(thread_id):
 
 @app.route('/api/threads/<int:thread_id>/data-tables', methods=['POST'])
 def add_data_table(thread_id):
-    try:
+    try:        
         data = request.get_json()
         conn = get_db()
         c = conn.cursor()

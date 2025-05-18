@@ -14,12 +14,16 @@ dependencies = [
     "minio",
     "python-dotenv",
     "matplotlib",
+    "tabulate",
     "pandas",
     "langchain_experimental",
     "pydantic",
     "plotly",
+    "typing_extensions",
     "cohere",
-    "langchain-cohere"          
+    "ollama",
+    "langchain-cohere",
+    "langchain-ollama"
 ]
 
 [build-system]

@@ -52,7 +52,7 @@ flask==3.1.1
     # via
     #   backend (pyproject.toml)
     #   flask-cors
-flask-cors==5.0.1
+flask-cors==6.0.0
     # via backend (pyproject.toml)
 fonttools==4.58.0
     # via matplotlib
@@ -91,6 +91,7 @@ httpx==0.28.1
     #   cohere
     #   langgraph-sdk
     #   langsmith
+    #   ollama
 httpx-sse==0.4.0
     # via
     #   cohere
@@ -124,7 +125,7 @@ langchain-community==0.3.24
     #   backend (pyproject.toml)
     #   langchain-cohere
     #   langchain-experimental
-langchain-core==0.3.59
+langchain-core==0.3.60
     # via
     #   backend (pyproject.toml)
     #   langchain
@@ -132,6 +133,7 @@ langchain-core==0.3.59
     #   langchain-community
     #   langchain-experimental
     #   langchain-google-genai
+    #   langchain-ollama
     #   langchain-text-splitters
     #   langgraph
     #   langgraph-checkpoint
@@ -140,11 +142,13 @@ langchain-experimental==0.3.4
     # via backend (pyproject.toml)
 langchain-google-genai==2.1.4
     # via langchain
+langchain-ollama==0.3.3
+    # via backend (pyproject.toml)
 langchain-text-splitters==0.3.8
     # via langchain
-langgraph==0.4.3
+langgraph==0.4.5
     # via backend (pyproject.toml)
-langgraph-checkpoint==2.0.25
+langgraph-checkpoint==2.0.26
     # via
     #   langgraph
     #   langgraph-prebuilt
@@ -174,14 +178,18 @@ multidict==6.4.3
     #   yarl
 mypy-extensions==1.1.0
     # via typing-inspect
-narwhals==1.39.0
+narwhals==1.39.1
     # via plotly
-numpy==2.2.5
+numpy==2.2.6
     # via
     #   contourpy
     #   langchain-community
     #   matplotlib
     #   pandas
+ollama==0.4.8
+    # via
+    #   backend (pyproject.toml)
+    #   langchain-ollama
 orjson==3.10.18
     # via
     #   langgraph-sdk
@@ -200,7 +208,7 @@ pandas==2.2.3
     # via backend (pyproject.toml)
 pillow==11.2.1
     # via matplotlib
-plotly==6.0.1
+plotly==6.1.0
     # via backend (pyproject.toml)
 propcache==0.3.1
     # via
@@ -225,7 +233,7 @@ pyasn1-modules==0.4.2
     # via google-auth
 pycparser==2.22
     # via cffi
-pycryptodome==3.22.0
+pycryptodome==3.23.0
     # via minio
 pydantic==2.11.4
     # via
@@ -237,6 +245,7 @@ pydantic==2.11.4
     #   langchain-google-genai
     #   langgraph
     #   langsmith
+    #   ollama
     #   pydantic-settings
 pydantic-core==2.33.2
     # via
@@ -283,6 +292,8 @@ sqlalchemy==2.0.41
     # via
     #   langchain
     #   langchain-community
+tabulate==0.9.0
+    # via backend (pyproject.toml)
 tenacity==9.1.2
     # via
     #   langchain-community
@@ -291,12 +302,13 @@ tokenizers==0.21.1
     # via cohere
 tqdm==4.67.1
     # via huggingface-hub
-types-pyyaml==6.0.12.20250402
+types-pyyaml==6.0.12.20250516
     # via langchain-cohere
-types-requests==2.32.0.20250328
+types-requests==2.32.0.20250515
     # via cohere
 typing-extensions==4.13.2
     # via
+    #   backend (pyproject.toml)
     #   cohere
     #   huggingface-hub
     #   langchain-core
