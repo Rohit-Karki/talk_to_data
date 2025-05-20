@@ -25,7 +25,8 @@ dependencies = [
     "langchain-cohere",
     "langchain-ollama",
     "tqdm",
-    "pymongo"
+    "pymongo",
+    "pinecone"
 ]
 
 [build-system]

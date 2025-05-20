@@ -1,9 +1,7 @@
 import os
 import io
 import pandas as pd
-from langchain_community import embeddings
 from langchain_core.vectorstores import InMemoryVectorStore
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_core.documents import Document
 from configs.minio_config import minio_client, MINIO_BUCKET
 from langchain_cohere import CohereEmbeddings

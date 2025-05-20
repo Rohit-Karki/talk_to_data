@@ -25,6 +25,7 @@ certifi==2025.4.26
     #   httpcore
     #   httpx
     #   minio
+    #   pinecone
     #   requests
 cffi==1.17.1
     # via argon2-cffi-bindings
@@ -98,7 +99,7 @@ httpx-sse==0.4.0
     # via
     #   cohere
     #   langchain-community
-huggingface-hub==0.31.2
+huggingface-hub==0.31.4
     # via tokenizers
 idna==3.10
     # via
@@ -174,13 +175,13 @@ matplotlib==3.10.3
     # via backend (pyproject.toml)
 minio==7.2.15
     # via backend (pyproject.toml)
-multidict==6.4.3
+multidict==6.4.4
     # via
     #   aiohttp
     #   yarl
 mypy-extensions==1.1.0
     # via typing-inspect
-narwhals==1.39.1
+narwhals==1.40.0
     # via plotly
 numpy==2.2.6
     # via
@@ -210,6 +211,10 @@ pandas==2.2.3
     # via backend (pyproject.toml)
 pillow==11.2.1
     # via matplotlib
+pinecone==6.0.2
+    # via backend (pyproject.toml)
+pinecone-plugin-interface==0.0.7
+    # via pinecone
 plotly==6.1.0
     # via backend (pyproject.toml)
 propcache==0.3.1
@@ -263,6 +268,7 @@ python-dateutil==2.9.0.post0
     # via
     #   matplotlib
     #   pandas
+    #   pinecone
 python-dotenv==1.1.0
     # via
     #   backend (pyproject.toml)
@@ -319,6 +325,7 @@ typing-extensions==4.13.2
     #   huggingface-hub
     #   langchain-core
     #   minio
+    #   pinecone
     #   pydantic
     #   pydantic-core
     #   sqlalchemy
@@ -335,6 +342,7 @@ tzdata==2025.2
 urllib3==2.4.0
     # via
     #   minio
+    #   pinecone
     #   requests
     #   types-requests
 werkzeug==3.1.3

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	let {threadId} = $props();
 	import SvelteMarkdown from 'svelte-markdown';
 
 	import Highlight from 'svelte-highlight';
@@ -273,7 +274,43 @@
 <svelte:head>
 	{@html _3024}
 </svelte:head>
-<div class="analysis-layout">
+
+{#if !selectedThread}
+    <div class="new-analysis-screen">
+        <div class="new-analysis-content">
+            <h1>Talk to Your Data</h1>
+            <p>Upload a file and start analyzing your data with natural language queries.</p>
+            
+            <div class="file-upload-section">
+                <FileUpload on:uploadComplete={handleFileUpload} />
+                {#if selectedFile}
+                    <div class="selected-file">
+                        Selected file: {selectedFile}
+                    </div>
+                {/if}
+            </div>
+
+            {#if selectedFile}
+                <div class="query-section">
+                    <textarea
+                        bind:value={analysisQuery}
+                        placeholder="What would you like to know about your data?"
+                        rows="3"
+                        class="new-analysis-query"
+                    ></textarea>
+                    <button
+                        on:click={() => handleAnalysisSubmit(selectedFile, 'New Analysis', analysisQuery)}
+                        disabled={!analysisQuery || loading}
+                        class="new-analysis-btn"
+                    >
+                        {loading ? 'Analyzing...' : 'Start Analysis'}
+                    </button>
+                </div>
+            {/if}
+        </div>
+    </div>
+{:else}
+    <div class="analysis-layout">
 	<aside class="analysis-sidebar-left">
 		<div class="sidebar-header">Analysis Threads</div>
 		<ul class="thread-list">
@@ -524,6 +561,44 @@
 			{/if}
 		</div>
 	</aside>
+	</div>
+{/if}
+
+<!-- New Analysis Screen (Hidden by default) -->
+<div class="new-analysis-screen" style="display: none;">
+	<div class="new-analysis-content">
+		<h1>New Analysis</h1>
+		<p>Select a file and enter your analysis query to get started.</p>
+
+		<div class="file-upload-section">
+			<FileUpload on:uploadComplete={handleFileUpload} />
+			{#if selectedFile}
+				<div class="selected-file">Selected File: {selectedFile}</div>
+			{/if}
+		</div>
+
+		<div class="query-section">
+			<textarea
+				bind:value={analysisQuery}
+				placeholder="Type your analysis query..."
+				rows="3"
+				class="new-analysis-query"
+			></textarea>
+			<button
+				on:click={() => {
+					// handleAnalysisSubmit(selectedFile);
+				}}
+				disabled={!selectedFile || !analysisQuery || loading}
+				class="new-analysis-btn"
+			>
+				{loading ? 'Generating...' : 'Generate Analysis'}
+			</button>
+		</div>
+
+		{#if error}
+			<div class="error-message">{error}</div>
+		{/if}
+	</div>
 </div>
 
 <style>
@@ -783,6 +858,90 @@
 		border-radius: 6px;
 		margin-top: 1rem;
 	}
+
+	.new-analysis-screen {
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		min-height: 100vh;
+		background: #f7f8fa;
+		padding: 2rem;
+	}
+
+	.new-analysis-content {
+		max-width: 800px;
+		width: 100%;
+		text-align: center;
+		padding: 2rem;
+		background: white;
+		border-radius: 12px;
+		box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+	}
+
+	.new-analysis-content h1 {
+		font-size: 2.5rem;
+		color: #1e40af;
+		margin-bottom: 1rem;
+	}
+
+	.new-analysis-content p {
+		color: #666;
+		font-size: 1.1rem;
+		margin-bottom: 2rem;
+	}
+
+	.file-upload-section {
+		margin-bottom: 2rem;
+	}
+
+	.selected-file {
+		margin-top: 1rem;
+		padding: 0.75rem;
+		background: #f0f4ff;
+		border-radius: 6px;
+		color: #1e40af;
+		font-weight: 500;
+	}
+
+	.query-section {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		max-width: 600px;
+		margin: 0 auto;
+	}
+
+	.new-analysis-query {
+		width: 100%;
+		padding: 1rem;
+		border: 1px solid #e0e0e0;
+		border-radius: 8px;
+		font-size: 1.1rem;
+		resize: vertical;
+		background: #f9fafb;
+	}
+
+	.new-analysis-btn {
+		padding: 1rem 2rem;
+		background-color: #6366f1;
+		color: white;
+		border: none;
+		border-radius: 8px;
+		font-size: 1.1rem;
+		font-weight: 500;
+		cursor: pointer;
+		transition: background 0.2s;
+	}
+
+	.new-analysis-btn:hover {
+		background-color: #4f46e5;
+	}
+
+	.new-analysis-btn:disabled {
+		background-color: #d1d5db;
+		cursor: not-allowed;
+	}
+
 	@media (max-width: 900px) {
 		.analysis-layout {
 			flex-direction: column;
