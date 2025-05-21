@@ -1,135 +1,107 @@
 from langchain_cohere import CohereEmbeddings
 from pymongo import MongoClient
-from langchain_core.vectorstores import InMemoryVectorStore
-from langchain.embeddings import CacheBackedEmbeddings
-from langchain.storage import LocalFileStore
-from config import MONGODB_URI, PINECONE_API_KEY
 from pinecone import Pinecone
-from pinecone import ServerlessSpec
+from llm import llm
+from langchain_core.messages import (
+    AIMessage,
+    AIMessageChunk,
+    BaseMessage,
+)
+from bson.objectid import ObjectId
+from config import MONGODB_URI, PINECONE_API_KEY
 
-pc = Pinecone(api_key=PINECONE_API_KEY)
+embeddings = CohereEmbeddings(model="embed-english-v3.0")
+
+# try:
+#     # test_query = embeddings.embed_query("Your Smart Foneloan 1ST EMI of NPR 18051.66 is due on May 21, 2025. Please maintain sufficient balance in your account ##886.")
+#     test_query = embeddings.embed_query(
+#         "Dear Cardholder, Your Card 4265***8715 was used at NEPAL MICROPUB PVT LTD, NP; for the Purchase of NPR1920.00 on 16.05.25 17:30 LAXMI SUNRISE BANK"
+#     )
+#     # test_query = embeddings.embed_query("Your Credit Card *8715 payment is due on 4:00PM, 20/05/25. Total and Min amounts due are Amt NPR 0.00 and Amt NPR 0.00 respectively.Kindly ignore if paid already")
+#     results = index.query(vector=test_query, top_k=2, include_metadata=True)
+#     print("\nTest query results:")
+#     print(f"Found {len(results['matches'])} matches")
+#     if results["matches"]:
+#         print(f"results: {results}")
+#         print(f"Top match score: {results['matches'][0]['score']}")
+# except Exception as e:
+#     print(f"Error during query: {e}")
 
 client = MongoClient(MONGODB_URI)
 db = client["sms_database"]
 collection = db["structured_messages"]
 
-embeddings = CohereEmbeddings(model="embed-english-v3.0")        
 
+def get_structured_examples_from_mongo(matches, collection):
+    examples = []
+    for match in matches:
+        msg_id = match["metadata"]["message_id"]
+        doc = collection.find_one({"_id": ObjectId(msg_id)})
+        print(f"Found message with ID: {doc}")
+        if doc:
+
+            examples.append(
+                {
+                    "original_message": doc,
+                }
+            )
+    return examples
+
+
+def create_llm_prompt(examples, new_message):
+    examples_text = "\n\n".join(
+        [f"Message: \"{ex['original_message']}" for ex in examples]
+    )
+
+    prompt = f"""
+You are a financial message schema extractor.
+
+You are a financial SMS parser. Given examples of previous messages schema, extract a JSON schema for the new message using a similar format.
+---
+Similar Messages:
+{examples_text}
+
+New Message:
+\"{new_message}\"
+
+Output a JSON schema of the original message schema which you find most relevant to the new message.
+as relevant to the message.
+
+Respond ONLY with a valid JSON object and no string with the json object or any thing at all.
+"""
+    return prompt
+
+
+pc = Pinecone(api_key=PINECONE_API_KEY)
 # Initialize Pinecone index
 index_name = "sms-msg"
-# try:
-#     # Check if index exists
-#     if index_name not in pc.list_indexes():
-#         print(f"Creating new index: {index_name}")
-#         pc.create_index(
-#             name=index_name,
-#             dimension=1024,  # Cohere embeddings dimension
-#             metric="cosine",
-#             spec=ServerlessSpec(
-#                 cloud="aws",
-#                 region="us-east-1"
-#             )
-#         )
-#     else:
-#         print(f"Index {index_name} already exists, skipping creation")
-    
-#     # Get the index instance
-    
-# except Exception as e:
-#     print(f"Error initializing Pinecone index: {e}")
-#     raise  # Re-raise the exception if you want to stop execution
+# Get the index instance
 index = pc.Index(index_name)
 
-# Add debug information
-print(f"Connected to index: {index_name}")
-stats = index.describe_index_stats()
-print(f"Current index stats: {stats}")
 
-# Process messages and upsert to Pinecone
-batch_size = 100
-vectors_batch = []
-
-try:
-    for message in collection.find():
-        vector = embeddings.embed_query(message['original_message'])
-        
-        vector_data = {
-            'id': str(message['_id']),
-            'values': vector,
-            'metadata': {
-                'message_id': str(message['_id']),
-                'timestamp': message.get('timestamp', ''),
-                'original_message': message['original_message']  # Include the original message
-            }
-        }
-        
-        vectors_batch.append(vector_data)
-        
-        if len(vectors_batch) >= batch_size:
-            try:
-                index.upsert(vectors=vectors_batch)
-                print(f"Successfully inserted batch of {len(vectors_batch)} vectors")
-                vectors_batch = []
-            except Exception as e:
-                print(f"Error during batch upsert: {e}")
-                vectors_batch = []
-
-    # Insert remaining vectors
-    if vectors_batch:
-        try:
-            index.upsert(vectors=vectors_batch)
-            print(f"Successfully inserted final batch of {len(vectors_batch)} vectors")
-        except Exception as e:
-            print(f"Error during final upsert: {e}")
-            
-except Exception as e:
-    print(f"Error during vector processing: {e}")
-
-print(index.describe_index_stats())
+def call_llm(prompt):
+    response = llm.invoke(
+        [
+            {
+                "role": "system",
+                "content": "You are a financial message schema extractor.",
+            },
+            {"role": "user", "content": prompt},
+        ],
+    )
+    return response.content.strip()
 
 
-# # create the query embedding
-# xq = embeddings.embed_query("Your EMI of NPR 29918.17 is due on 2024-01-12.")
-
-# # query, returning the top 10 most similar results
-# res = index.query(vector=xq, top_k=1, include_metadata=True)
-
-# print(res)
-# for match in res['matches']:
-#     print(f"{match['score']:.2f}: {match['metadata']['text']}")
+# test_msg = "Your Smart Foneloan 1ST EMI of NPR 18051.66 is due on May 21, 2025. Please maintain sufficient balance in your account ##886."
+test_msg = "Your Credit Card *8715 payment is due on 4:00PM, 20/05/25. Kindly ignore if paid already."
+test_query = embeddings.embed_query(test_msg)
+results = index.query(vector=test_query, top_k=2, include_metadata=True)
 
 
-# Add this after your insertion code
-def verify_vectors():
-    # Check index statistics
-    stats = index.describe_index_stats()
-    print(f"\nIndex Statistics:")
-    print(f"Total vectors: {stats.total_vector_count}")
-    print(f"Namespaces: {stats.namespaces}")
-
-    # Try fetching a specific vector
-    sample_id = vectors_batch[0]['id'] if vectors_batch else None
-    if sample_id:
-        try:
-            fetch_response = index.fetch(ids=[sample_id])
-            print(f"\nFetched vector with ID {sample_id}:")
-            print(f"Vector exists: {sample_id in fetch_response.vectors}")
-        except Exception as e:
-            print(f"Error fetching vector: {e}")
-
-    # Try a simple search
-    try:
-        test_query = embeddings.embed_query("test query")
-        results = index.query(
-            vector=test_query,
-            top_k=1,
-            include_metadata=True
-        )
-        print("\nTest query results:")
-        print(f"Found {len(results['matches'])} matches")
-        if results['matches']:
-            print(f"Top match score: {results['matches'][0]['score']}")
-    except Exception as e:
-        print(f"Error during query: {e}")
-
-verify_vectors()
+if results["matches"]:
+    llm_prompt = create_llm_prompt(
+        get_structured_examples_from_mongo(results["matches"], collection), test_msg
+    )
+    print("LLM Prompt:\n", llm_prompt)
+    json_output = call_llm(llm_prompt)
+    print("Generated Schema:\n", json_output)

@@ -3,13 +3,12 @@ from pymongo import MongoClient
 from bson.objectid import ObjectId
 from config import MONGODB_URI
 from langchain_community.vectorstores import FAISS as LangchainFAISS
-from main import vector_store, embeddings
+from .main import vector_store, embeddings
 
 # Initialize MongoDB connection
 client = MongoClient(MONGODB_URI)
 db = client["sms_database"]
 collection = db["structured_messages"]
-
 
 def query_message(message_text: str) -> dict:
     """
@@ -41,8 +40,7 @@ def query_message(message_text: str) -> dict:
             return {"error": "Referenced document not found in MongoDB"}
             
         return {
-            "matched_category": mongo_doc.get("category"),
-            "schema_example": mongo_doc.get("parsed_schema"),
+            "matched_category": mongo_doc.get("category"),     
             "similarity_score": float(score),
             "original_message": mongo_doc.get("original_message")
         }

@@ -1,66 +1,89 @@
 from langchain_cohere import CohereEmbeddings
 from pymongo import MongoClient
-# import faiss
-from langchain_core.vectorstores import InMemoryVectorStore
-from langchain.embeddings import CacheBackedEmbeddings
-from langchain.storage import LocalFileStore
-from configs import MONGODB_URI
+from pinecone import Pinecone
+from llm import llm
+from langchain_core.messages import (
+    AIMessage,
+    AIMessageChunk,
+    BaseMessage,
+)
 
-client = MongoClient(MONGODB_URI)
-db = client["sms_database"]
-collection = db["structured_messages"]
+embeddings = CohereEmbeddings(model="embed-english-v3.0")
 
-# embeddings = CohereEmbeddings(model="embed-english-v3.0")
-
-# Sample messages
-messages = [
-    {
-        "original_message": "Your EMI of NPR 29918.17 is due on 2024-01-12.",
-        "parsed_schema" : {
-            "transaction_type": "emi_due",
-            "amount": 29918.17,
-            "currency": "NPR",
-            "due_date": "2024-02-12",
-            "account": None,
-            "remarks": "we request you to pay on time to avoid penalty charges.",
-            "original_message": "emi amount npr 29918.17 is due on 2024-02-12. we request you to pay on time to avoid penalty charges."
-        }
-    }
-]
-# messages = [
-#     "Your EMI of NPR 29918.17 is due on 2024-01-12.",
-#     "Dear iajna, your verification code for forgot password is 494560.",
-#     "Please collect policy book of no UL192687 from agency office and deliver to the policy owner."
-# ]
-
-# Initialize FAISS
-# dimension = 1024  # Cohere embeddings
-# faiss_index = faiss.IndexFlatL2(dimension)
-# id_map = faiss.IndexIDMap(faiss_index)
-# index = faiss.IndexFlatL2(len(embeddings.embed_query("hello world")))
+try:
+    # test_query = embeddings.embed_query("Your Smart Foneloan 1ST EMI of NPR 18051.66 is due on May 21, 2025. Please maintain sufficient balance in your account ##886.")
+    test_query = embeddings.embed_query(
+        "Dear Cardholder, Your Card 4265***8715 was used at NEPAL MICROPUB PVT LTD, NP; for the Purchase of NPR1920.00 on 16.05.25 17:30 LAXMI SUNRISE BANK"
+    )
+    # test_query = embeddings.embed_query("Your Credit Card *8715 payment is due on 4:00PM, 20/05/25. Total and Min amounts due are Amt NPR 0.00 and Amt NPR 0.00 respectively.Kindly ignore if paid already")
+    results = index.query(vector=test_query, top_k=2, include_metadata=True)
+    print("\nTest query results:")
+    print(f"Found {len(results['matches'])} matches")
+    if results["matches"]:
+        print(f"results: {results}")
+        print(f"Top match score: {results['matches'][0]['score']}")
+except Exception as e:
+    print(f"Error during query: {e}")
 
 
-# store = LocalFileStore("./cache/")
-# cached_embedder = CacheBackedEmbeddings.from_bytes_store(
-#             embeddings, store, namespace=embeddings.model
-#         )
-# vector_store = InMemoryVectorStore(cached_embedder)
+def create_llm_prompt(new_message, similar_matches):
+    context = "\n".join(
+        [
+            f"{i+1}. original_message: \"{match['metadata']['original_message']}\""
+            for i, match in enumerate(similar_matches)
+        ]
+    )
+
+    prompt = f"""
+You are a financial message schema extractor.
+
+Given the following previously seen messages and a new input message, generate a structured JSON schema that extracts important fields.
+
+---
+Similar Messages:
+{context}
+
+New Message:
+\"{new_message}\"
+
+Output a JSON schema with fields such as:
+- amount
+- currency
+- transaction_type
+- account_number / masked_account
+- date
+- time
+- merchant
+- loan_type
+- emi_number
+- balance
+- instruction
+as relevant to the message.
+
+Respond ONLY with a valid JSON object.
+"""
+    return prompt
 
 
-# for each message in unstructured_data perform the following steps
+def call_llm(prompt):
+    response = llm.invoke(
+        [
+            {
+                "role": "system",
+                "content": "You are a financial message schema extractor.",
+            },
+            {"role": "user", "content": prompt},
+        ],
+    )
+    return response.choices[0].message.content
 
-for message in collection.find():
-    print(message)
-    # vector = embeddings.embed_query(message["original_message"])
-    # _ = vector_store.add_documents()
-    # index.upsert([
-    #     {
-    #         "id": message["_id"],
-    #         "values": vector,
-    #         "metadata": {
-    #             "mongo_id": message["_id"],
-    #             "original_message": message,
-    #         }
-    #     }
-    # ])
 
+test_msg = "Your Smart Foneloan 1ST EMI of NPR 18051.66 is due on May 21, 2025. Please maintain sufficient balance in your account ##886."
+
+test_query = embeddings.embed_query(test_msg)
+results = index.query(vector=test_query, top_k=2, include_metadata=True)
+
+if results["matches"]:
+    llm_prompt = create_llm_prompt(test_msg, results["matches"])
+    json_output = call_llm(llm_prompt)
+    print("Generated Schema:\n", json_output)
