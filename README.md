@@ -28,7 +28,6 @@ The research is expected to deliver the following outcomes:
     • Insights into the potential impact of LLM-based data exploration on customer segmentation and personalization strategies: The research will explore how this technology can lead to more granular and actionable customer insights.
     • Identification of potential challenges and limitations: The research will also highlight any obstacles encountered and suggest future research directions.
 
-## Project StructureBackend Project
 # Talk to Data Project Description
 
 ## 1. Backend Project
@@ -36,7 +35,7 @@ The research is expected to deliver the following outcomes:
 - **Primary Language**: Python
 - **Key Components**:
   - Flask API
-  - SQL Database (SQLite with Chinook.db)
+  - SQL Database (SQLite with Chinook.db) (place your database url)
   - Data Analysis Tools (pandas, chart generation)
   - LLM Integration
   - MinIO Storage Integration
@@ -55,17 +54,6 @@ Serves as the main backend service handling data analysis, SQL queries, and char
 ### Purpose
 Main user interface for interacting with the data analysis features. Built with modern web technologies focusing on performance and developer experience.
 
-## 3. Finance Adviser Project
-### Technology Stack
-- **Primary Framework**: SvelteKit
-- **Additional Technologies**:
-  - TypeScript
-  - Tailwind CSS
-  - Vite
-
-### Purpose
-A specialized frontend application focused on financial advice and analysis, providing a dedicated interface for financial data visualization and recommendations.
-
 ## 4. Infrastructure
 ### Technology Stack
 - Docker
@@ -75,37 +63,20 @@ A specialized frontend application focused on financial advice and analysis, pro
 Manages the deployment and orchestration of all services, ensuring consistent development and production environments.
 
 ## Project Overview
-Talk to Data is an LLM-powered dashboard and reporting system that enables natural language interaction with data stored in a data lakehouse. The project focuses on making data exploration and visualization accessible through conversational interfaces.
-
-## Architecture
-
-### Backend (backend)
-- **Framework**: Flask
-- **Language**: Python
-- **Key Components**:
-  - SQL Database (SQLite/Chinook.db)
-  - LLM Integration (CodeLlama)
-  - MinIO for object storage
-  - Pandas for data analysis
-  - LangGraph for workflow orchestration
-
-### Frontend (frontend)
-- **Framework**: SvelteKit
-- **Language**: TypeScript
-- **UI Components**: 
-  - Storybook for component documentation
-  - Custom visualization components
-  - Chat interface for data queries
+Talk to Data is an LLM-powered dashboard and reporting system that enables natural language interaction with data stored in a data lakehouse(currently in a sqlite database). The project focuses on making data exploration and visualization accessible through conversational interfaces.
 
 ## Core Features
-
 ### 1. Natural Language Query Processing
+![alt text](architecure_1.png)
+It is the solution to the problem where Business professionals who doesn't know SQL to get the data from the database. Now, they can use natural language to run query to the databases.
+
 The system uses CodeLlama to:
 - Parse natural language questions
 - Convert them to SQL/analysis queries
-- Generate visualizations and explanations
+- Generate sql result and explanations.
 
 ### 2. Data Analysis Pipeline
+![alt text](architecture_2.png)
 ```python
 StateGraph(State).add_sequence([
     write_query,       # Converts natural language to SQL
@@ -324,7 +295,7 @@ minio:
   secret_key: "${MINIO_SECRET_KEY}"
 ````
 
-## Error Handling
+<!-- ## Error Handling
 
 ````python
 class QueryError(Exception):
@@ -340,7 +311,7 @@ def handle_query_error(error: QueryError):
         "message": error.message,
         "query": error.query
     }
-````
+```` -->
 
 ## Limitations
 

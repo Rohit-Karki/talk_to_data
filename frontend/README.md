@@ -1,3 +1,11 @@
+### Frontend (frontend)
+- **Framework**: SvelteKit
+- **Language**: TypeScript
+- **UI Components**: 
+  - Storybook for component documentation
+  - Custom visualization components
+  - Chat interface for data queries
+
 # sv
 
 Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
