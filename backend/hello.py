@@ -93,7 +93,8 @@ def call_llm(prompt):
 
 
 # test_msg = "Your Smart Foneloan 1ST EMI of NPR 18051.66 is due on May 21, 2025. Please maintain sufficient balance in your account ##886."
-test_msg = "Your Credit Card *8715 payment is due on 4:00PM, 20/05/25. Kindly ignore if paid already."
+# test_msg = "Your Credit Card *8715 payment is due on 4:00PM, 20/05/25. Kindly ignore if paid already."
+test_msg = "we request you to pay  your emi amount  npr 29918.17 today to avoid penalty charges. please ignore if already paid."
 test_query = embeddings.embed_query(test_msg)
 results = index.query(vector=test_query, top_k=2, include_metadata=True)
 
