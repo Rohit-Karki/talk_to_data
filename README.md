@@ -73,3 +73,302 @@ A specialized frontend application focused on financial advice and analysis, pro
 
 ### Purpose
 Manages the deployment and orchestration of all services, ensuring consistent development and production environments.
+
+## Project Overview
+Talk to Data is an LLM-powered dashboard and reporting system that enables natural language interaction with data stored in a data lakehouse. The project focuses on making data exploration and visualization accessible through conversational interfaces.
+
+## Architecture
+
+### Backend (backend)
+- **Framework**: Flask
+- **Language**: Python
+- **Key Components**:
+  - SQL Database (SQLite/Chinook.db)
+  - LLM Integration (CodeLlama)
+  - MinIO for object storage
+  - Pandas for data analysis
+  - LangGraph for workflow orchestration
+
+### Frontend (frontend)
+- **Framework**: SvelteKit
+- **Language**: TypeScript
+- **UI Components**: 
+  - Storybook for component documentation
+  - Custom visualization components
+  - Chat interface for data queries
+
+## Core Features
+
+### 1. Natural Language Query Processing
+The system uses CodeLlama to:
+- Parse natural language questions
+- Convert them to SQL/analysis queries
+- Generate visualizations and explanations
+
+### 2. Data Analysis Pipeline
+```python
+StateGraph(State).add_sequence([
+    write_query,       # Converts natural language to SQL
+    execute_sql_query, # Executes the query
+    generate_answer    # Generates response/visualization
+])
+```
+
+### 3. File Management
+- Supports CSV upload
+- MinIO integration for file storage
+- Metadata extraction and content description
+
+## Limitations
+
+### Technical Constraints
+1. Memory Requirements:
+   - 7B models: 8GB RAM
+   - 70B models: 140GB RAM
+
+2. Processing Speed:
+   - LLM inference time can impact response times
+   - Complex queries may have performance overhead
+
+### Functional Limitations
+1. Query Complexity:
+   - Limited to structured data analysis
+   - May struggle with highly complex analytical queries
+
+2. Visualization Types:
+   - Pre-defined chart types only
+   - Custom visualizations require manual implementation
+
+## Deployment
+
+### Requirements
+```bash
+# Hardware
+- RAM: 8GB minimum (140GB+ for 70B models)
+- Storage: 140GB+ free space
+- GPU: 80GB VRAM for optimal performance
+
+# Software
+- Docker and Docker Compose
+- Python 3.x
+- Node.js for frontend
+```
+
+### Setup
+1. Backend:
+```bash
+cd backend
+pip install -r requirements.txt
+python main.py
+```
+
+2. Frontend:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+3. LLM Setup:
+```bash
+ollama run codellama
+# or
+ollama run codellama:13B
+```
+
+## Best Practices
+1. Use intermediate tables for frequent queries
+2. Implement proper error handling for LLM responses
+3. Monitor memory usage with large models
+4. Cache common query results
+5. Implement rate limiting for API endpoints
+
+## Future Improvements
+1. Support for more complex data relationships
+2. Enhanced visualization capabilities
+3. Better query optimization
+4. Multi-model LLM support
+5. Advanced caching mechanisms
+
+This system aims to democratize data access while maintaining performance and usability. Its modular architecture allows for future extensions and improvements.
+
+## What It Does
+
+Talk to Data is an intelligent data interaction system that:
+
+1. **Natural Language Data Querying**
+   - Allows users to ask questions about their data in plain English
+   - Examples:
+     - "Show me sales trends for last quarter"
+     - "What were the top performing products?"
+
+2. **Automated Analysis & Visualization**
+   - Converts natural language to appropriate queries
+   - Generates relevant visualizations automatically
+   - Provides explanations in natural language
+
+3. **Multi-source Data Integration**
+   - Connects to various data sources:
+     - SQL databases
+     - CSV files
+     - Data warehouses
+     - Object storage (MinIO)
+
+## Technical Architecture
+
+### 1. Query Processing Pipeline
+
+````python
+from langgraph.graph import StateGraph
+
+def process_query(query: str):
+    graph = StateGraph()
+    
+    # Natural language understanding
+    graph.add_node("parse", parse_query)
+    
+    # SQL generation
+    graph.add_node("generate_sql", generate_sql_query)
+    
+    # Query execution
+    graph.add_node("execute", execute_query)
+    
+    # Result formatting
+    graph.add_node("format", format_results)
+    
+    return graph.run({"input": query})
+````
+
+### 2. Frontend Components
+
+````typescript
+<script lang="ts">
+  import { createEventDispatcher } from 'svelte';
+  
+  export let query: string = '';
+  const dispatch = createEventDispatcher();
+  
+  async function handleQuery() {
+    const response = await fetch('/api/query', {
+      method: 'POST',
+      body: JSON.stringify({ query })
+    });
+    const result = await response.json();
+    dispatch('result', result);
+  }
+</script>
+
+<div class="chat-interface">
+  <input bind:value={query} />
+  <button on:click={handleQuery}>Ask</button>
+</div>
+````
+
+## Core Features In-Depth
+
+### 1. LLM Query Understanding
+- Uses CodeLlama to:
+  - Parse intent
+  - Identify entities
+  - Determine query type
+  - Generate appropriate SQL
+
+### 2. Data Processing
+- Performs:
+  - Data cleaning
+  - Type inference
+  - Schema validation
+  - Query optimization
+
+### 3. Visualization Engine
+- Automatically selects appropriate chart types
+- Supports:
+  - Time series
+  - Bar charts
+  - Scatter plots
+  - Heat maps
+  - Custom visualizations
+
+## Setup Instructions
+
+````bash
+# Install backend dependencies
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# Install frontend dependencies
+cd frontend
+npm install
+
+# Start services
+docker-compose up -d
+````
+
+## Configuration Example
+
+````yaml
+llm:
+  model: "codellama:13b"
+  temperature: 0.7
+  max_tokens: 1000
+
+database:
+  type: "sqlite"
+  path: "./data/chinook.db"
+
+minio:
+  endpoint: "localhost:9000"
+  access_key: "${MINIO_ACCESS_KEY}"
+  secret_key: "${MINIO_SECRET_KEY}"
+````
+
+## Error Handling
+
+````python
+class QueryError(Exception):
+    def __init__(self, message: str, query: str = None):
+        self.message = message
+        self.query = query
+        super().__init__(self.message)
+
+def handle_query_error(error: QueryError):
+    logger.error(f"Query failed: {error.message}")
+    return {
+        "status": "error",
+        "message": error.message,
+        "query": error.query
+    }
+````
+
+## Limitations
+
+1. **Query Complexity**
+   - Limited to SQL-expressible queries
+   - Cannot handle complex statistical analysis
+   - No support for nested subqueries
+
+2. **Performance**
+   - LLM inference time: 1-3 seconds
+   - Large dataset limitations
+   - Memory constraints with 70B models
+
+3. **Data Types**
+   - Primarily structured data
+   - Limited support for:
+     - Binary data
+     - Unstructured text
+     - Image analysis
+
+4. **Visualization**
+   - Fixed set of chart types
+   - Limited customization options
+   - No interactive visualizations
+
+5. **Security**
+   - Basic authentication only
+   - No row-level security
+   - Limited access controls
+
+This document will be updated as new features and improvements are added to the system.
